@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChatWidget } from './ChatWidget';
+import { Home, Map, Newspaper, Settings, Phone, User, ChevronDown, Calculator, Ruler } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -10,9 +11,34 @@ const Navbar = () => {
   const location = useLocation();
   const isHome = location.pathname === '/';
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [isUtilsOpen, setIsUtilsOpen] = React.useState(false);
+  const [isVisible, setIsVisible] = React.useState(true);
+  const [lastScrollY, setLastScrollY] = React.useState(0);
+
+  React.useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        setIsVisible(false);
+      } else {
+        setIsVisible(true);
+      }
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY]);
+
+  const navLinks = [
+    { to: '/', label: 'Trang Chủ', icon: Home },
+    { to: '/projects', label: 'SẢN PHẨM', icon: Map },
+    { to: '/consignment', label: 'Ký Gửi', icon: Newspaper },
+    { to: '#', label: 'Tin Tức', icon: Newspaper },
+  ];
 
   return (
-    <nav className={`fixed w-full z-50 transition-all duration-300 ${isHome ? 'bg-transparent text-white pt-6' : 'bg-navy-900 text-white shadow-lg py-4'}`}>
+    <nav className={`fixed w-full z-50 transition-all duration-300 no-print ${isVisible ? 'translate-y-0' : '-translate-y-full'} ${isHome ? 'bg-transparent text-white pt-6' : 'bg-navy-900 text-white shadow-lg py-4'}`}>
       <div className="container mx-auto px-6 flex justify-between items-center">
         <Link to="/" className="text-2xl font-serif font-bold tracking-widest hover:text-gold-400 transition-colors">
           BOM BO REAL
@@ -20,17 +46,15 @@ const Navbar = () => {
         
         {/* Desktop Menu */}
         <div className="hidden md:flex space-x-8 text-sm font-medium tracking-wide items-center">
-          <Link to="/" className="hover:text-gold-400 transition-colors uppercase">Trang Chủ</Link>
-          <Link to="/projects" className="hover:text-gold-400 transition-colors uppercase">Dự Án</Link>
-          <a href="#" className="hover:text-gold-400 transition-colors uppercase">Tin Tức</a>
+          {navLinks.map((link) => (
+            <Link key={link.to} to={link.to} className="hover:text-gold-400 transition-colors uppercase">{link.label}</Link>
+          ))}
           
           {/* Utilities Dropdown */}
           <div className="relative group">
             <button className="hover:text-gold-400 transition-colors uppercase flex items-center gap-1">
               Tiện Ích
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              <ChevronDown className="w-4 h-4" />
             </button>
             <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
               <Link to="/utilities/interest-rate" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gold-500">Tính Lãi Suất</Link>
@@ -52,17 +76,69 @@ const Navbar = () => {
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden bg-navy-900 border-t border-gray-800 text-white p-6 space-y-4 text-sm font-medium tracking-wide flex flex-col items-center">
-          <Link to="/" className="hover:text-gold-400 transition-colors uppercase" onClick={() => setIsMenuOpen(false)}>Trang Chủ</Link>
-          <Link to="/projects" className="hover:text-gold-400 transition-colors uppercase" onClick={() => setIsMenuOpen(false)}>Dự Án</Link>
-          <a href="#" className="hover:text-gold-400 transition-colors uppercase" onClick={() => setIsMenuOpen(false)}>Tin Tức</a>
-          <div className="flex flex-col items-center space-y-2">
-            <span className="text-gray-400 uppercase text-xs">Tiện Ích</span>
-            <Link to="/utilities/interest-rate" className="hover:text-gold-400 transition-colors uppercase" onClick={() => setIsMenuOpen(false)}>Tính Lãi Suất</Link>
-            <Link to="/utilities/area" className="hover:text-gold-400 transition-colors uppercase" onClick={() => setIsMenuOpen(false)}>Tính Diện Tích</Link>
+        <div className="md:hidden bg-navy-900 border-t border-gray-800 text-white p-6 space-y-2 text-sm font-medium tracking-wide flex flex-col">
+          {navLinks.map((link) => (
+            <Link 
+              key={link.to} 
+              to={link.to} 
+              className="flex items-center space-x-3 p-3 hover:bg-navy-800 rounded-xl transition-colors uppercase" 
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <link.icon className="w-5 h-5 text-gold-400" />
+              <span>{link.label}</span>
+            </Link>
+          ))}
+          
+          <div className="w-full">
+            <button 
+              onClick={() => setIsUtilsOpen(!isUtilsOpen)}
+              className="flex items-center justify-between p-3 hover:bg-navy-800 rounded-xl transition-colors uppercase w-full"
+            >
+              <div className="flex items-center space-x-3">
+                <Settings className="w-5 h-5 text-gold-400" />
+                <span>Tiện Ích</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isUtilsOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {isUtilsOpen && (
+              <div className="flex flex-col space-y-1 pl-12 py-2 bg-navy-800/30 rounded-xl mt-1">
+                <Link 
+                  to="/utilities/interest-rate" 
+                  className="flex items-center space-x-3 py-3 hover:text-gold-400 transition-colors uppercase text-xs" 
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Calculator className="w-4 h-4" />
+                  <span>Tính Lãi Suất</span>
+                </Link>
+                <Link 
+                  to="/utilities/area" 
+                  className="flex items-center space-x-3 py-3 hover:text-gold-400 transition-colors uppercase text-xs" 
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Ruler className="w-4 h-4" />
+                  <span>Tính Diện Tích</span>
+                </Link>
+              </div>
+            )}
           </div>
-          <Link to="/contact" className="hover:text-gold-400 transition-colors uppercase" onClick={() => setIsMenuOpen(false)}>Liên Hệ</Link>
-          <Link to="/admin" className="hover:text-gold-400 transition-colors uppercase" onClick={() => setIsMenuOpen(false)}>Admin</Link>
+
+          <Link 
+            to="/contact" 
+            className="flex items-center space-x-3 p-3 hover:bg-navy-800 rounded-xl transition-colors uppercase" 
+            onClick={() => setIsMenuOpen(false)}
+          >
+            <Phone className="w-5 h-5 text-gold-400" />
+            <span>Liên Hệ</span>
+          </Link>
+          <Link 
+            to="/admin" 
+            className="flex items-center space-x-3 p-3 hover:bg-navy-800 rounded-xl transition-colors uppercase" 
+            onClick={() => setIsMenuOpen(false)}
+          >
+            <User className="w-5 h-5 text-gold-400" />
+            <span>Admin</span>
+          </Link>
         </div>
       )}
     </nav>
@@ -70,7 +146,7 @@ const Navbar = () => {
 };
 
 const Footer = () => (
-  <footer className="bg-navy-900 text-gray-300 py-12 border-t border-gray-800">
+  <footer className="bg-navy-900 text-gray-300 py-12 border-t border-gray-800 no-print">
     <div className="container mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
       <div>
         <h3 className="text-2xl font-serif text-white mb-4">BOM BO REAL</h3>
@@ -100,17 +176,22 @@ const Footer = () => (
 );
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const location = useLocation();
+  const isHome = location.pathname === '/';
+
   return (
     <div className="min-h-screen flex flex-col font-sans">
       <Navbar />
-      <main className="flex-grow">
+      <main className={`flex-grow ${isHome ? '' : 'pt-20'}`}>
         {children}
       </main>
       <Footer />
-      <ChatWidget />
+      <div className="no-print">
+        <ChatWidget />
+      </div>
       
       {/* Floating Contact Buttons */}
-      <div className="fixed bottom-24 right-6 z-40 flex flex-col gap-2">
+      <div className="fixed bottom-24 right-6 z-40 flex flex-col gap-2 no-print">
         <a 
           href="tel:0969320229" 
           className="bg-green-600 text-white p-1.5 rounded-full shadow-lg hover:bg-green-700 transition-all animate-bounce"
