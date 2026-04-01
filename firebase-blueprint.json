@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "Conversation": {
+      "title": "Conversation",
+      "description": "A chat session between a user and the AI assistant.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique identifier for the user." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the conversation started." },
+        "messages": {
+          "type": "array",
+          "description": "List of messages in the conversation.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": { "type": "string", "enum": ["user", "ai"] },
+              "text": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      },
+      "required": ["userId", "createdAt", "messages"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Information about a customer who interacted with the chatbot.",
+      "type": "object",
+      "properties": {
+        "phoneNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "lastContacted": { "type": "string", "format": "date-time" }
+      },
+      "required": ["phoneNumber"]
+    },
+    "VisitorLog": {
+      "title": "VisitorLog",
+      "description": "Tracks visitor activity and contact information.",
+      "type": "object",
+      "properties": {
+        "visitorId": { "type": "string" },
+        "name": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "lastVisited": { "type": "string", "format": "date-time" },
+        "source": { "type": "string" },
+        "device": { "type": "string" },
+        "viewedPlots": { "type": "array", "items": { "type": "string" } },
+        "pageHistory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pageUrl": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      },
+      "required": ["visitorId", "lastVisited", "viewedPlots", "pageHistory"]
+    }
+  },
+  "firestore": {
+    "/conversations/{conversationId}": {
+      "schema": { "$ref": "Conversation" },
+      "description": "Stores individual chat sessions."
+    },
+    "/customers/{phoneNumber}": {
+      "schema": { "$ref": "Customer" },
+      "description": "Stores customer contact information."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "Appointment" },
+      "description": "Stores scheduled project viewing appointments."
+    },
+    "/visitor_logs/{visitorId}": {
+      "schema": { "$ref": "VisitorLog" },
+      "description": "Tracks visitor activity and contact information."
+    }
+  }
+}
