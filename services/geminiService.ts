@@ -4,8 +4,8 @@ import { LandPlot } from "../types";
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 export const generatePlotAnalysis = async (plot: LandPlot): Promise<string> => {
-  // Lấy API key từ biến môi trường (hỗ trợ cả chuẩn Vite và chuẩn Node)
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  // Lấy API key từ biến môi trường
+  const apiKey = process.env.GEMINI_API_KEY;
 
   // Kiểm tra Key trước khi gọi để tránh lỗi hệ thống
   if (!apiKey || apiKey.trim() === "") {
@@ -74,7 +74,7 @@ export const generatePlotAnalysis = async (plot: LandPlot): Promise<string> => {
 };
 
 export const analyzeVisitorBehavior = async (visitor: any, plots: LandPlot[]): Promise<string> => {
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.trim() === "") throw new Error("API_KEY_MISSING");
 
   const ai = new GoogleGenAI({ apiKey: apiKey });
