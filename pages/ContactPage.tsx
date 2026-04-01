@@ -12,11 +12,6 @@ export const ContactPage: React.FC = () => {
   });
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const HOTLINE = '0969 320 229';
-  const ZALO = '0969 320 229';
-  const ADDRESS = 'Bình Phước, Việt Nam';
-  const FACEBOOK = 'https://facebook.com/bombreal';
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -53,10 +48,9 @@ export const ContactPage: React.FC = () => {
           <div className="bg-white p-8 rounded-xl shadow-sm">
             <h2 className="text-2xl font-bold text-navy-900 mb-6">Thông tin liên hệ</h2>
             <div className="space-y-4 text-gray-600">
-              <p><strong>Hotline:</strong> {HOTLINE}</p>
-              <p><strong>Zalo:</strong> {ZALO}</p>
-              {FACEBOOK && <p><strong>Facebook:</strong> <a href={FACEBOOK} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Ghé thăm Fanpage</a></p>}
-              <p><strong>Địa chỉ:</strong> {ADDRESS}</p>
+              <p><strong>Hotline:</strong> 0969 320 229</p>
+              <p><strong>Email:</strong> info.bomboreal@gmail.com</p>
+              <p><strong>Địa chỉ:</strong> Bom Bo Real, KĐT THÁI THÀNH BOM BO, Xã Bom Bo, Đồng Nai</p>
             </div>
             
             <div className="mt-8">

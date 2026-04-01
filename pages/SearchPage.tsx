@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PROJECT_HERO_IMAGE } from '../constants';
+import { PROJECT_HERO_IMAGE, GOOGLE_SHEET_CSV_URL_BOMBO, GOOGLE_SHEET_CSV_URL_OTHER } from '../constants';
 import { fetchLandPlots } from '../services/dataService';
 import { LandPlot } from '../types';
 
@@ -8,12 +8,14 @@ export const SearchPage: React.FC = () => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [plots, setPlots] = useState<LandPlot[]>([]);
+  const [bomboPlots, setBomboPlots] = useState<LandPlot[]>([]);
+  const [otherPlots, setOtherPlots] = useState<LandPlot[]>([]);
   const navigate = useNavigate();
 
   // Pre-load data when page opens
   useEffect(() => {
-    fetchLandPlots().then(data => setPlots(data));
+    fetchLandPlots(GOOGLE_SHEET_CSV_URL_BOMBO).then(data => setBomboPlots(data));
+    fetchLandPlots(GOOGLE_SHEET_CSV_URL_OTHER).then(data => setOtherPlots(data));
   }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -25,12 +27,17 @@ export const SearchPage: React.FC = () => {
 
     try {
       // Ensure we have the latest data
-      const currentPlots = plots.length > 0 ? plots : await fetchLandPlots();
+      const currentBombo = bomboPlots.length > 0 ? bomboPlots : await fetchLandPlots(GOOGLE_SHEET_CSV_URL_BOMBO);
+      const currentOther = otherPlots.length > 0 ? otherPlots : await fetchLandPlots(GOOGLE_SHEET_CSV_URL_OTHER);
       const normalizedCode = code.trim().toUpperCase();
-      const plot = currentPlots.find(p => p.id.toUpperCase() === normalizedCode);
+      
+      const plotInBombo = currentBombo.find(p => p.id.toUpperCase() === normalizedCode);
+      const plotInOther = currentOther.find(p => p.id.toUpperCase() === normalizedCode);
 
-      if (plot) {
-        navigate(`/plot/${normalizedCode}`);
+      if (plotInBombo) {
+        navigate(`/plot/${normalizedCode}?source=bombo`);
+      } else if (plotInOther) {
+        navigate(`/plot/${normalizedCode}?source=other`);
       } else {
         setError('Mã nền không tồn tại. Vui lòng kiểm tra lại.');
       }

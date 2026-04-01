@@ -489,6 +489,7 @@ export const AdminPage: React.FC = () => {
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorLog | null>(null);
   const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageHistoryCurrentPage, setPageHistoryCurrentPage] = useState(1);
   const [loadingAssessment, setLoadingAssessment] = useState(false);
   const visitorsPerPage = 20;
 
@@ -669,6 +670,15 @@ export const AdminPage: React.FC = () => {
       }
     }
   }, [conversations, selectedConv]);
+
+  useEffect(() => {
+    if (selectedVisitor) {
+      const updatedVisitor = visitors.find(v => v.id === selectedVisitor.id);
+      if (updatedVisitor) {
+        setSelectedVisitor(updatedVisitor);
+      }
+    }
+  }, [visitors, selectedVisitor]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1108,7 +1118,7 @@ export const AdminPage: React.FC = () => {
             <div className={`${selectedVisitor ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r flex-col`}>
               <div className="flex-grow overflow-y-auto">
                 {currentVisitors.map(visitor => (
-                  <div key={visitor.id} onClick={() => setSelectedVisitor(visitor)} className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedVisitor?.id === visitor.id ? 'bg-gray-200' : ''}`}>
+                  <div key={visitor.id} onClick={() => { setSelectedVisitor(visitor); setPageHistoryCurrentPage(1); }} className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedVisitor?.id === visitor.id ? 'bg-gray-200' : ''}`}>
                     <div className="flex justify-between items-start">
                       <div className="flex-grow overflow-hidden">
                         <p className="font-bold truncate">{visitor.name || 'Khách ẩn danh'}</p>
@@ -1318,10 +1328,33 @@ export const AdminPage: React.FC = () => {
                       </ul>
                     </div>
                   )}
-                  <p className="font-bold">Lịch sử trang:</p>
-                  <ul className="list-disc pl-5">
-                    {selectedVisitor.pageHistory.map((h, i) => <li key={i}>{h.pageUrl} ({new Date(h.timestamp).toLocaleString()})</li>)}
+                  <p className="font-bold mt-4">Lịch sử trang:</p>
+                  <ul className="list-disc pl-5 mt-2 space-y-1">
+                    {[...selectedVisitor.pageHistory]
+                      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                      .slice((pageHistoryCurrentPage - 1) * 10, pageHistoryCurrentPage * 10)
+                      .map((h, i) => (
+                        <li key={i} className="text-sm break-all">
+                          <a href={h.pageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            {h.pageUrl}
+                          </a>
+                          <span className="text-gray-500 ml-2">({new Date(h.timestamp).toLocaleString()})</span>
+                        </li>
+                      ))}
                   </ul>
+                  {selectedVisitor.pageHistory.length > 10 && (
+                    <div className="flex justify-center mt-4 gap-2 flex-wrap">
+                      {Array.from({ length: Math.ceil(selectedVisitor.pageHistory.length / 10) }, (_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setPageHistoryCurrentPage(i + 1)}
+                          className={`px-3 py-1 rounded text-sm ${pageHistoryCurrentPage === i + 1 ? 'bg-navy-900 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                        >
+                          {i + 1}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-8 pt-8 border-t">
                     {deleteConfirm?.id === selectedVisitor.id ? (
                       <div className="flex items-center space-x-4">

@@ -4,16 +4,15 @@ import { LandPlot } from '../types';
 import { getPlotById } from '../services/dataService';
 import { generatePlotAnalysis } from '../services/geminiService';
 import { MakeOfferPopup } from '../components/MakeOfferPopup';
-import { useVisitorTracker } from '../hooks/useVisitorTracker';
-import { GOOGLE_SHEET_CSV_URL_BOMBO } from '../constants';
+import { GOOGLE_SHEET_CSV_URL_BOMBO, GOOGLE_SHEET_CSV_URL_OTHER } from '../constants';
 
 export const DetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { search } = useLocation();
   const query = new URLSearchParams(search);
-  const url = query.get('url') || undefined;
+  const source = query.get('source');
+  const url = source === 'other' ? GOOGLE_SHEET_CSV_URL_OTHER : GOOGLE_SHEET_CSV_URL_BOMBO;
 
-  useVisitorTracker(id || '');
   const [plot, setPlot] = useState<LandPlot | null>(null);
   const [loading, setLoading] = useState(true);
   const [aiAnalysis, setAiAnalysis] = useState<string>('');

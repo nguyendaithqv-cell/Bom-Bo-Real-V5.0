@@ -55,7 +55,7 @@ export const ProjectsPage: React.FC = () => {
 
   const plots = view === 'bombo' ? bomboPlots : otherPlots;
   const title = view === 'bombo' ? 'Thái Thành Bom Bo' : 'Sản phẩm khác';
-  const url = view === 'bombo' ? GOOGLE_SHEET_CSV_URL_BOMBO : GOOGLE_SHEET_CSV_URL_OTHER;
+  const source = view === 'bombo' ? 'bombo' : 'other';
   
   const itemsPerPage = 10;
   const totalPages = Math.ceil(plots.length / itemsPerPage);
@@ -73,7 +73,7 @@ export const ProjectsPage: React.FC = () => {
               <h4 className="font-bold text-lg mb-2">Lô: {plot.id}</h4>
               <p>Diện tích: {plot.area} m²</p>
               <p>Giá: {plot.totalPrice.toLocaleString('vi-VN')} VNĐ</p>
-              <Link to={`/plot/${plot.id}?url=${encodeURIComponent(url)}`} className="text-blue-600 hover:underline mt-auto pt-2">Xem chi tiết</Link>
+              <Link to={`/plot/${plot.id}?source=${source}`} className="text-blue-600 hover:underline mt-auto pt-2">Xem chi tiết</Link>
             </div>
           ))}
         </div>
