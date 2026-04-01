@@ -1,25 +1,28 @@
 import { LandPlot, Direction, LegalStatus } from '../types';
-import { GOOGLE_SHEET_CSV_URL, SAMPLE_PLOTS } from '../constants';
+import { GOOGLE_SHEET_CSV_URL_BOMBO, GOOGLE_SHEET_CSV_URL_OTHER, SAMPLE_PLOTS } from '../constants';
 import { parseCSV } from '../utils/csvParser';
 
-let cachedPlots: LandPlot[] | null = null;
+const cache: Record<string, LandPlot[]> = {};
 
-export const fetchLandPlots = async (): Promise<LandPlot[]> => {
-  if (cachedPlots) return cachedPlots;
+export const fetchLandPlots = async (url: string = GOOGLE_SHEET_CSV_URL_BOMBO): Promise<LandPlot[]> => {
+  if (cache[url]) return cache[url];
 
   // Nếu chưa cấu hình URL, dùng ngay dữ liệu mẫu
-  if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL.trim() === "") {
+  if (!url || url.trim() === "") {
     return SAMPLE_PLOTS;
   }
 
   try {
-    const response = await fetch(GOOGLE_SHEET_CSV_URL);
+    console.log(`Fetching data from: ${url}`);
+    const response = await fetch(url);
     
     if (!response.ok) {
+        console.error(`Failed to fetch Google Sheet: ${response.status} ${response.statusText}`);
         throw new Error(`Failed to fetch Google Sheet: ${response.status} ${response.statusText}`);
     }
     
     const csvText = await response.text();
+    console.log("CSV Text snippet:", csvText.substring(0, 200));
 
     // KIỂM TRA QUAN TRỌNG:
     // Nếu Google Sheet chưa được Public, nó sẽ trả về mã HTML của trang đăng nhập Google thay vì CSV.
@@ -29,6 +32,7 @@ export const fetchLandPlots = async (): Promise<LandPlot[]> => {
     }
 
     const rawData = parseCSV(csvText);
+    console.log("Parsed data length:", rawData.length);
 
     const parseNumber = (val: any): number => {
       if (val === undefined || val === null || val === '') return 0;
@@ -88,7 +92,7 @@ export const fetchLandPlots = async (): Promise<LandPlot[]> => {
     }));
 
     if (plots.length > 0) {
-        cachedPlots = plots;
+        cache[url] = plots;
         return plots;
     } else {
         return SAMPLE_PLOTS; 
@@ -99,7 +103,7 @@ export const fetchLandPlots = async (): Promise<LandPlot[]> => {
   }
 };
 
-export const getPlotById = async (id: string): Promise<LandPlot | undefined> => {
-  const plots = await fetchLandPlots();
+export const getPlotById = async (id: string, url: string = GOOGLE_SHEET_CSV_URL_BOMBO): Promise<LandPlot | undefined> => {
+  const plots = await fetchLandPlots(url);
   return plots.find(p => p.id.toUpperCase() === id.toUpperCase());
 };
