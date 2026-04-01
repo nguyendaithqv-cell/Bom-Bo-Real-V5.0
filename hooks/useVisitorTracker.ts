@@ -83,3 +83,18 @@ export const trackVisitorOffer = async (visitorId: string, plotId: string, offer
     });
   }
 };
+
+export const trackVisitorConsignment = async (visitorId: string, consignmentData: any) => {
+  const visitorRef = doc(db, 'visitor_logs', visitorId);
+  const visitorSnap = await getDoc(visitorRef);
+  
+  if (visitorSnap.exists()) {
+    await updateDoc(visitorRef, {
+      status: 'resale',
+      lastConsignment: {
+        ...consignmentData,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+};
