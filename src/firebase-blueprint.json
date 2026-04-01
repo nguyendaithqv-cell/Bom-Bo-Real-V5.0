@@ -1,0 +1,127 @@
+{
+  "entities": {
+    "Conversation": {
+      "title": "Conversation",
+      "description": "A chat session between a user and the AI assistant.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique identifier for the user." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the conversation started." },
+        "messages": {
+          "type": "array",
+          "description": "List of messages in the conversation.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": { "type": "string", "enum": ["user", "ai"] },
+              "text": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      },
+      "required": ["userId", "createdAt", "messages"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Information about a customer who interacted with the chatbot.",
+      "type": "object",
+      "properties": {
+        "phoneNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "lastContacted": { "type": "string", "format": "date-time" }
+      },
+      "required": ["phoneNumber"]
+    },
+    "VisitorLog": {
+      "title": "VisitorLog",
+      "description": "Tracks visitor activity and contact information.",
+      "type": "object",
+      "properties": {
+        "visitorId": { "type": "string" },
+        "name": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "lastVisited": { "type": "string", "format": "date-time" },
+        "source": { "type": "string" },
+        "device": { "type": "string" },
+        "viewedPlots": { "type": "array", "items": { "type": "string" } },
+        "pageHistory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pageUrl": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      },
+      "required": ["visitorId", "lastVisited", "viewedPlots", "pageHistory"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "A potential customer being managed by a staff member.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "source": { "type": "string" },
+        "status": { "type": "string", "enum": ["new", "contacting", "negotiating", "closed", "lost"] },
+        "assignedTo": { "type": "string", "description": "UID of the staff member." },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" },
+              "createdAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phone", "status", "assignedTo", "createdAt"]
+    },
+    "StaffProfile": {
+      "title": "StaffProfile",
+      "description": "Profile information for a staff member.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["staff", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/conversations/{conversationId}": {
+      "schema": { "$ref": "Conversation" },
+      "description": "Stores individual chat sessions."
+    },
+    "/customers/{phoneNumber}": {
+      "schema": { "$ref": "Customer" },
+      "description": "Stores customer contact information."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "Appointment" },
+      "description": "Stores scheduled project viewing appointments."
+    },
+    "/visitor_logs/{visitorId}": {
+      "schema": { "$ref": "VisitorLog" },
+      "description": "Tracks visitor activity and contact information."
+    },
+    "/leads/{leadId}": {
+      "schema": { "$ref": "Lead" },
+      "description": "Stores leads managed by staff."
+    },
+    "/staff_profiles/{uid}": {
+      "schema": { "$ref": "StaffProfile" },
+      "description": "Stores staff profile information."
+    }
+  }
+}

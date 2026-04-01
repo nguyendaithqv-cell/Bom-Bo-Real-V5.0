@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Mở toàn bộ quyền truy cập để tránh lỗi phân quyền theo yêu cầu của người dùng
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
