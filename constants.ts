@@ -8,7 +8,8 @@ import { LandPlot, Direction, LegalStatus } from './types';
 // Lưu ý: Nếu biến này để trống (""), web sẽ chạy bằng dữ liệu mẫu (SAMPLE_PLOTS).
 
 // Đã chuyển đổi link edit thành link export CSV
-export const GOOGLE_SHEET_CSV_URL: string = "https://docs.google.com/spreadsheets/d/1ntEdOfoh3VKodvr3xv6QHRjNmhXA0MLrWcT162RLUKs/export?format=csv"; 
+export const GOOGLE_SHEET_CSV_URL_BOMBO: string = "https://docs.google.com/spreadsheets/d/1ntEdOfoh3VKodvr3xv6QHRjNmhXA0MLrWcT162RLUKs/export?format=csv";
+export const GOOGLE_SHEET_CSV_URL_OTHER: string = "https://docs.google.com/spreadsheets/d/1EuQYxT3R7Uw_oYaa2rCGd2UGRlwQoblbYQRplrCAjCg/export?format=csv";
 
 // ==========================================
 // HÌNH NỀN TRANG CHỦ (HERO IMAGE)

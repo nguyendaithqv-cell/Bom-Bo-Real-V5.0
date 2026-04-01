@@ -57,9 +57,35 @@
         }
       },
       "required": ["visitorId", "lastVisited", "viewedPlots", "pageHistory"]
+    },
+    "Consignment": {
+      "title": "Consignment",
+      "description": "Real estate consignment information submitted by customers.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "zalo": { "type": "string" },
+        "propertyType": { "type": "string" },
+        "address": { "type": "string" },
+        "area": { "type": "string" },
+        "dimensions": { "type": "string" },
+        "price": { "type": "string" },
+        "legalStatus": { "type": "string" },
+        "direction": { "type": "string" },
+        "description": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["pending", "contacted", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "phoneNumber", "propertyType", "address", "price", "createdAt"]
     }
   },
   "firestore": {
+    "/consignments/{consignmentId}": {
+      "schema": { "$ref": "Consignment" },
+      "description": "Stores real estate consignment submissions."
+    },
     "/conversations/{conversationId}": {
       "schema": { "$ref": "Conversation" },
       "description": "Stores individual chat sessions."
