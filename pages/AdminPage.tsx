@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { db, auth } from '../firebase';
-import { collection, query, orderBy, onSnapshot, getDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
+import { db } from '../firebase';
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { fetchLandPlots } from '../services/dataService';
 import { analyzeVisitorBehavior } from '../services/geminiService';
 import { LandPlot } from '../types';
@@ -38,17 +37,12 @@ const handleFirestoreError = (error: unknown, operationType: OperationType, path
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
+      userId: 'anonymous',
+      email: 'anonymous',
+      emailVerified: false,
+      isAnonymous: true,
+      tenantId: '',
+      providerInfo: []
     },
     operationType,
     path
@@ -109,13 +103,15 @@ interface VisitorLog {
   pageHistory: { pageUrl: string, timestamp: string }[];
   aiAssessment?: string;
   offers?: { plotId: string, offeredPrice: string, originalPrice?: number, timestamp: string }[];
-  status?: 'new' | 'contacting' | 'negotiating' | 'closed' | 'junk' | 'employee';
+  status?: 'new' | 'contacting' | 'negotiating' | 'closed' | 'junk' | 'employee' | 'resale';
   notes?: string;
+  crmNotes?: string;
   reminders?: { text: string, date: string, completed: boolean }[];
   potentialScore?: number;
+  lastConsignment?: { propertyType: string, address: string, price: number, timestamp: string };
 }
 
-const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, setActiveTab: (t: string) => void, onLogout: () => void }) => {
+const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const tabs = [
     { id: 'dashboard', name: 'Trang Chủ' },
@@ -123,6 +119,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
     { id: 'chat', name: 'Chat Box AI' },
     { id: 'customers', name: 'Danh Sách Khách Hàng' },
     { id: 'visitors', name: 'Khách truy cập' },
+    { id: 'consignment', name: 'Yêu cầu Ký gửi' },
     { id: 'analytics', name: 'Thống kê & Báo cáo' },
     { id: 'office', name: 'Quản lý văn phòng' },
     { id: 'potential', name: 'Khách Hàng Tiềm Năng' },
@@ -142,9 +139,6 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
             {tab.name}
           </button>
         ))}
-        <button onClick={onLogout} className="block w-full text-left p-3 rounded text-red-400 hover:bg-navy-800 mt-8">
-          Đăng xuất
-        </button>
       </div>
     </div>
   );
@@ -415,7 +409,7 @@ const OfficeView = ({ visitors }: { visitors: VisitorLog[] }) => {
                     </div>
                   </td>
                   <td className="p-4 text-xs text-gray-500">
-                    {s.lastVisited?.toDate().toLocaleString()}
+                    {formatDate(s.lastVisited)}
                   </td>
                 </tr>
               )) : (
@@ -446,6 +440,41 @@ const OfficeView = ({ visitors }: { visitors: VisitorLog[] }) => {
   );
 };
 
+export interface Consignment {
+  id: string;
+  fullName: string;
+  phoneNumber: string;
+  zalo?: string;
+  propertyType: string;
+  address: string;
+  area: string;
+  dimensions?: string;
+  price: string;
+  legalStatus: string;
+  direction: string;
+  description: string;
+  images: string[];
+  status: 'pending' | 'reviewed' | 'contacted' | 'completed' | 'rejected';
+  createdAt: any;
+}
+
+const formatDate = (date: any) => {
+  if (!date) return 'N/A';
+  if (typeof date.toDate === 'function') {
+    return date.toDate().toLocaleString();
+  }
+  if (typeof date === 'string') {
+    return new Date(date).toLocaleString();
+  }
+  if (date instanceof Date) {
+    return date.toLocaleString();
+  }
+  if (date.seconds !== undefined) {
+    return new Date(date.seconds * 1000).toLocaleString();
+  }
+  return 'Invalid Date';
+};
+
 export const AdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -453,10 +482,12 @@ export const AdminPage: React.FC = () => {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [visitors, setVisitors] = useState<VisitorLog[]>([]);
+  const [consignments, setConsignments] = useState<Consignment[]>([]);
   const [plots, setPlots] = useState<LandPlot[]>([]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorLog | null>(null);
+  const [selectedConsignment, setSelectedConsignment] = useState<Consignment | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingAssessment, setLoadingAssessment] = useState(false);
   const visitorsPerPage = 20;
@@ -468,16 +499,13 @@ export const AdminPage: React.FC = () => {
     else console.error('Mật khẩu không đúng!');
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-  };
-
   const handleDelete = async (collectionName: string, id: string) => {
     try {
       await deleteDoc(doc(db, collectionName, id));
       setDeleteConfirm(null);
       setSelectedConv(null);
       setSelectedVisitor(null);
+      setSelectedConsignment(null);
     } catch (error) {
       console.error('Delete error:', error);
     }
@@ -540,6 +568,17 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  const handleUpdateConsignmentStatus = async (consignmentId: string, status: string) => {
+    try {
+      await updateDoc(doc(db, 'consignments', consignmentId), { status });
+      if (selectedConsignment && selectedConsignment.id === consignmentId) {
+        setSelectedConsignment({ ...selectedConsignment, status: status as any });
+      }
+    } catch (error) {
+      console.error('Consignment Update error:', error);
+    }
+  };
+
   useEffect(() => {
     if (!isAuthenticated) return;
     
@@ -584,13 +623,21 @@ export const AdminPage: React.FC = () => {
       handleFirestoreError(error, OperationType.LIST, 'visitor_logs');
     });
 
+    const qConsignments = query(collection(db, 'consignments'), orderBy('createdAt', 'desc'));
+    const unsubscribeConsignments = onSnapshot(qConsignments, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Consignment[];
+      setConsignments(data);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'consignments');
+    });
+
     const loadPlots = async () => {
       const data = await fetchLandPlots();
       setPlots(data);
     };
     loadPlots();
 
-    return () => { unsubscribe(); unsubscribeOffers(); unsubscribeContacts(); unsubscribeVisitors(); };
+    return () => { unsubscribe(); unsubscribeOffers(); unsubscribeContacts(); unsubscribeVisitors(); unsubscribeConsignments(); };
   }, [isAuthenticated]);
 
   // Real-time notifications
@@ -627,6 +674,7 @@ export const AdminPage: React.FC = () => {
     setCurrentPage(1);
     setSelectedConv(null);
     setSelectedVisitor(null);
+    setSelectedConsignment(null);
   }, [activeTab]);
 
   if (!isAuthenticated) {
@@ -681,6 +729,7 @@ export const AdminPage: React.FC = () => {
           { label: 'KH Bán lại', value: conversations.filter(c => c.classification === 'resale').length, color: 'bg-orange-600', icon: '🔄' },
           { label: 'Tin nhắn liên hệ', value: contacts.length, color: 'bg-blue-600', icon: '📧' },
           { label: 'Khách truy cập', value: visitors.length, color: 'bg-purple-600', icon: '👥' },
+          { label: 'Yêu cầu ký gửi', value: consignments.length, color: 'bg-red-600', icon: '📝' },
           { label: 'Tổng sản phẩm', value: plots.length, color: 'bg-gold-600', icon: '🏠' },
         ];
 
@@ -888,7 +937,7 @@ export const AdminPage: React.FC = () => {
                 {currentConvs.map(conv => (
                   <div key={conv.id} onClick={() => setSelectedConv(conv)} className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedConv?.id === conv.id ? 'bg-gray-200' : ''}`}>
                     <p className="font-bold truncate">Khách hàng {conv.id.slice(0, 5)}</p>
-                    <p className="text-xs text-gray-500">{conv.createdAt?.toDate().toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">{formatDate(conv.createdAt)}</p>
                     <span className={`text-xs px-2 py-1 rounded ${conv.classification === 'resale' ? 'bg-red-100 text-red-800' : conv.classification === 'potential' ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
                       {conv.classification === 'resale' ? 'Bán lại' : conv.classification === 'potential' ? 'Tiềm năng' : 'Thường'}
                     </span>
@@ -945,7 +994,7 @@ export const AdminPage: React.FC = () => {
                 {currentOffers.map(offer => (
                   <div key={offer.id} onClick={() => setSelectedConv({ id: offer.id, userId: offer.name, createdAt: offer.createdAt, messages: [{role: 'user', text: JSON.stringify(offer)}] })} className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedConv?.id === offer.id ? 'bg-gray-200' : ''}`}>
                     <p className="font-bold truncate">Trả giá: {offer.plotId} - {offer.name}</p>
-                    <p className="text-xs text-gray-500">{offer.createdAt?.toDate().toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">{formatDate(offer.createdAt)}</p>
                   </div>
                 ))}
               </div>
@@ -962,7 +1011,7 @@ export const AdminPage: React.FC = () => {
                     <p><strong>Số điện thoại:</strong> {offer.phone}</p>
                     <p><strong>Giá cũ:</strong> {new Intl.NumberFormat('vi-VN').format(offer.originalPrice)} VNĐ</p>
                     <p><strong>Giá khách trả:</strong> {new Intl.NumberFormat('vi-VN').format(Number(offer.offeredPrice))} VNĐ</p>
-                    <p><strong>Thời gian:</strong> {offer.createdAt?.toDate().toLocaleString()}</p>
+                    <p><strong>Thời gian:</strong> {formatDate(offer.createdAt)}</p>
                     <div className="mt-8 pt-8 border-t">
                       {deleteConfirm?.id === offer.id ? (
                         <div className="flex items-center space-x-4">
@@ -1019,7 +1068,7 @@ export const AdminPage: React.FC = () => {
                     <p><strong>Email:</strong> {contact.email}</p>
                     <p><strong>Số điện thoại:</strong> {contact.phone}</p>
                     <p><strong>Tin nhắn:</strong> {contact.message}</p>
-                    <p><strong>Thời gian:</strong> {contact.createdAt?.toDate().toLocaleString()}</p>
+                    <p><strong>Thời gian:</strong> {formatDate(contact.createdAt)}</p>
                     <div className="mt-8 pt-8 border-t">
                       {deleteConfirm?.id === contact.id ? (
                         <div className="flex items-center space-x-4">
@@ -1055,26 +1104,28 @@ export const AdminPage: React.FC = () => {
       case 'visitors':
         const currentVisitors = visitors.slice(startIndex, endIndex);
         return (
-          <div className="flex h-[calc(100vh-160px)] bg-white rounded-lg shadow overflow-hidden">
-            <div className="w-1/3 border-r flex flex-col">
+          <div className="flex flex-col md:flex-row h-[calc(100vh-160px)] bg-white rounded-lg shadow overflow-hidden">
+            <div className={`${selectedVisitor ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r flex-col`}>
               <div className="flex-grow overflow-y-auto">
                 {currentVisitors.map(visitor => (
                   <div key={visitor.id} onClick={() => setSelectedVisitor(visitor)} className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedVisitor?.id === visitor.id ? 'bg-gray-200' : ''}`}>
                     <div className="flex justify-between items-start">
-                      <div>
+                      <div className="flex-grow overflow-hidden">
                         <p className="font-bold truncate">{visitor.name || 'Khách ẩn danh'}</p>
                         <p className="text-xs text-gray-500 truncate">{visitor.phoneNumber || 'Không có SĐT'}</p>
                       </div>
                       {visitor.potentialScore !== undefined && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${visitor.potentialScore > 70 ? 'bg-green-100 text-green-700' : 'bg-gold-100 text-gold-700'}`}>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ml-2 ${visitor.potentialScore > 70 ? 'bg-green-100 text-green-700' : 'bg-gold-100 text-gold-700'}`}>
                           {visitor.potentialScore}
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1">{visitor.lastVisited?.toDate().toLocaleString()}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{formatDate(visitor.lastVisited)}</p>
                     {visitor.status && (
-                      <span className="text-[9px] uppercase font-bold text-navy-500 bg-navy-50 px-1 rounded mt-1 inline-block">
-                        {visitor.status}
+                      <span className={`text-[9px] uppercase font-bold px-1 rounded mt-1 inline-block ${
+                        visitor.status === 'resale' ? 'bg-red-100 text-red-600' : 'text-navy-500 bg-navy-50'
+                      }`}>
+                        {visitor.status === 'resale' ? 'Khách bán lại' : visitor.status}
                       </span>
                     )}
                   </div>
@@ -1082,15 +1133,51 @@ export const AdminPage: React.FC = () => {
               </div>
               {renderPagination(visitors.length)}
             </div>
-            <div className="w-2/3 p-6 overflow-y-auto flex flex-col">
+            <div className={`${selectedVisitor ? 'flex' : 'hidden md:flex'} w-full md:w-2/3 p-4 md:p-6 overflow-y-auto flex-col`}>
               {selectedVisitor ? (
                 <div className="flex-grow space-y-4">
+                  <div className="flex items-center mb-4 md:hidden">
+                    <button onClick={() => setSelectedVisitor(null)} className="text-navy-600 font-bold flex items-center">
+                      <span className="mr-2">←</span> Quay lại
+                    </button>
+                  </div>
                   <p className="font-bold text-lg">Chi tiết khách truy cập</p>
-                  <p><strong>Tên:</strong> {selectedVisitor.name || 'Chưa cập nhật'}</p>
-                  <p><strong>SĐT:</strong> {selectedVisitor.phoneNumber || 'Chưa cập nhật'}</p>
-                  <p><strong>Nguồn:</strong> {selectedVisitor.source}</p>
-                  <p><strong>Thiết bị:</strong> {selectedVisitor.device}</p>
-                  <p><strong>Lần cuối:</strong> {selectedVisitor.lastVisited?.toDate().toLocaleString()}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <p><strong>Tên:</strong> {selectedVisitor.name || 'Chưa cập nhật'}</p>
+                    <p><strong>SĐT:</strong> {selectedVisitor.phoneNumber || 'Chưa cập nhật'}</p>
+                    <p><strong>Nguồn:</strong> {selectedVisitor.source}</p>
+                    <p><strong>Thiết bị:</strong> {selectedVisitor.device}</p>
+                    <p><strong>Lần cuối:</strong> {formatDate(selectedVisitor.lastVisited)}</p>
+                    <p><strong>Trạng thái:</strong> <span className={selectedVisitor.status === 'resale' ? 'text-red-600 font-bold' : ''}>{selectedVisitor.status || 'Thường'}</span></p>
+                  </div>
+
+                  <div className="bg-navy-50 p-4 rounded-xl border border-navy-100 mt-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-bold text-navy-900">Ghi chú CRM</h3>
+                      <span className="text-[10px] text-navy-400 uppercase font-bold tracking-widest">Nội bộ</span>
+                    </div>
+                    <textarea 
+                      className="w-full p-3 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-gold-500 outline-none min-h-[100px]"
+                      placeholder="Ghi chú về khách hàng này..."
+                      value={selectedVisitor.crmNotes || ''}
+                      onChange={(e) => handleUpdateVisitorCRM(selectedVisitor.id, 'crmNotes', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => handleUpdateVisitorCRM(selectedVisitor.id, 'status', 'potential')} className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700">Đánh dấu Tiềm năng</button>
+                    <button onClick={() => handleUpdateVisitorCRM(selectedVisitor.id, 'status', 'employee')} className="bg-navy-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-navy-700">Đánh dấu Nhân viên</button>
+                    <button onClick={() => handleUpdateVisitorCRM(selectedVisitor.id, 'status', 'resale')} className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-700">Đánh dấu Khách bán lại</button>
+                  </div>
+
+                  {selectedVisitor.lastConsignment && (
+                    <div className="bg-red-50 p-4 rounded-xl border border-red-100 mt-4">
+                      <h3 className="font-bold text-red-900 mb-2">Yêu cầu ký gửi gần nhất</h3>
+                      <p className="text-sm"><strong>Loại:</strong> {selectedVisitor.lastConsignment.propertyType}</p>
+                      <p className="text-sm"><strong>Địa chỉ:</strong> {selectedVisitor.lastConsignment.address}</p>
+                      <p className="text-sm"><strong>Giá:</strong> {new Intl.NumberFormat('vi-VN').format(selectedVisitor.lastConsignment.price)} VNĐ</p>
+                    </div>
+                  )}
                   
                   <div className="bg-navy-50 p-4 rounded-xl border border-navy-100 mt-4">
                     <div className="flex justify-between items-center mb-3">
@@ -1266,6 +1353,132 @@ export const AdminPage: React.FC = () => {
             </div>
           </div>
         );
+      case 'consignment':
+        const currentConsignments = consignments.slice(startIndex, endIndex);
+        return (
+          <div className="flex flex-col md:flex-row h-[calc(100vh-160px)] bg-white rounded-lg shadow overflow-hidden">
+            <div className={`${selectedConsignment ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r flex-col`}>
+              <div className="flex-grow overflow-y-auto">
+                {currentConsignments.map(consignment => (
+                  <div key={consignment.id} onClick={() => setSelectedConsignment(consignment)} className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedConsignment?.id === consignment.id ? 'bg-gray-200' : ''}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-grow overflow-hidden">
+                        <p className="font-bold truncate">{consignment.fullName || 'Khách ký gửi'}</p>
+                        <p className="text-xs text-gray-500 truncate">{consignment.phoneNumber}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ml-2 ${
+                        consignment.status === 'completed' ? 'bg-green-100 text-green-700' :
+                        consignment.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                        consignment.status === 'pending' ? 'bg-gold-100 text-gold-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {consignment.status}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">{formatDate(consignment.createdAt)}</p>
+                    <p className="text-[10px] text-navy-600 mt-1 font-medium truncate">{consignment.address}</p>
+                  </div>
+                ))}
+              </div>
+              {renderPagination(consignments.length)}
+            </div>
+            <div className={`${selectedConsignment ? 'flex' : 'hidden md:flex'} w-full md:w-2/3 p-4 md:p-6 overflow-y-auto flex-col`}>
+              {selectedConsignment ? (
+                <div className="flex-grow space-y-6">
+                  <div className="flex items-center mb-4 md:hidden">
+                    <button onClick={() => setSelectedConsignment(null)} className="text-navy-600 font-bold flex items-center">
+                      <span className="mr-2">←</span> Quay lại
+                    </button>
+                  </div>
+                  <div className="flex flex-col md:flex-row justify-between items-start border-b pb-4 gap-4">
+                    <div>
+                      <h2 className="text-xl md:text-2xl font-bold text-navy-900">Chi tiết ký gửi</h2>
+                      <p className="text-xs text-gray-500">Mã: {selectedConsignment.id}</p>
+                    </div>
+                    <div className="flex flex-col items-end w-full md:w-auto">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase mb-1">Cập nhật trạng thái:</label>
+                      <select 
+                        value={selectedConsignment.status} 
+                        onChange={(e) => handleUpdateConsignmentStatus(selectedConsignment.id, e.target.value)}
+                        className="text-sm border rounded p-2 bg-gray-50 font-bold text-navy-900 w-full md:w-auto"
+                      >
+                        <option value="pending">Chờ duyệt</option>
+                        <option value="reviewed">Đã xem</option>
+                        <option value="contacted">Đã liên hệ</option>
+                        <option value="completed">Đã chốt</option>
+                        <option value="rejected">Từ chối</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <h3 className="font-bold text-navy-900 border-l-4 border-gold-500 pl-3">Thông tin khách hàng</h3>
+                      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                        <p><span className="text-gray-500 text-sm">Họ tên:</span> <span className="font-bold">{selectedConsignment.fullName}</span></p>
+                        <p><span className="text-gray-500 text-sm">SĐT:</span> <span className="font-bold">{selectedConsignment.phoneNumber}</span></p>
+                        {selectedConsignment.zalo && <p><span className="text-gray-500 text-sm">Zalo:</span> <span className="font-bold">{selectedConsignment.zalo}</span></p>}
+                      </div>
+
+                      <h3 className="font-bold text-navy-900 border-l-4 border-gold-500 pl-3 mt-6">Thông tin bất động sản</h3>
+                      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                        <p><span className="text-gray-500 text-sm">Loại:</span> <span className="font-bold">{selectedConsignment.propertyType}</span></p>
+                        <p><span className="text-gray-500 text-sm">Địa chỉ:</span> <span className="font-bold">{selectedConsignment.address}</span></p>
+                        <p><span className="text-gray-500 text-sm">Diện tích:</span> <span className="font-bold">{selectedConsignment.area} m² {selectedConsignment.dimensions ? `(${selectedConsignment.dimensions})` : ''}</span></p>
+                        <p><span className="text-gray-500 text-sm">Giá:</span> <span className="font-bold text-gold-600">{selectedConsignment.price} VNĐ</span></p>
+                        <p><span className="text-gray-500 text-sm">Pháp lý:</span> <span className="font-bold">{selectedConsignment.legalStatus}</span></p>
+                        <p><span className="text-gray-500 text-sm">Hướng:</span> <span className="font-bold">{selectedConsignment.direction}</span></p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h3 className="font-bold text-navy-900 border-l-4 border-gold-500 pl-3">Mô tả chi tiết</h3>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <p className="text-sm text-navy-800 whitespace-pre-line leading-relaxed">{selectedConsignment.description}</p>
+                      </div>
+
+                      <h3 className="font-bold text-navy-900 border-l-4 border-gold-500 pl-3 mt-6">Hình ảnh ({selectedConsignment.images?.length || 0})</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        {selectedConsignment.images?.map((img, i) => (
+                          <div key={i} className="aspect-video bg-gray-200 rounded overflow-hidden cursor-pointer hover:opacity-80 transition-opacity" onClick={() => window.open(img)}>
+                            <img src={img} alt={`Property ${i}`} className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 pt-8 border-t">
+                    {deleteConfirm?.id === selectedConsignment.id ? (
+                      <div className="flex items-center space-x-4">
+                        <span className="text-red-600 font-bold">Xác nhận xóa?</span>
+                        <button 
+                          onClick={() => handleDelete('consignments', selectedConsignment.id)}
+                          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+                        >
+                          Đồng ý xóa
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirm(null)}
+                          className="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 transition-colors"
+                        >
+                          Hủy
+                        </button>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => setDeleteConfirm({ collection: 'consignments', id: selectedConsignment.id })}
+                        className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
+                      >
+                        Xóa yêu cầu ký gửi này
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : <p className="text-gray-500 text-center mt-20">Chọn yêu cầu ký gửi để xem chi tiết</p>}
+            </div>
+          </div>
+        );
       case 'analytics':
         return <AnalyticsView visitors={visitors} plots={plots} offers={offers} />;
       case 'office':
@@ -1277,7 +1490,7 @@ export const AdminPage: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="flex-grow p-4 md:p-8 bg-gray-100 overflow-y-auto">
         <h1 className="text-xl md:text-2xl font-bold mb-6 capitalize">{activeTab}</h1>
         {renderContent()}

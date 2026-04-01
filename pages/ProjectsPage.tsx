@@ -1,55 +1,95 @@
-import React from 'react';
-import { PROJECT_HERO_IMAGE } from '../constants';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { PROJECT_HERO_IMAGE, GOOGLE_SHEET_CSV_URL_BOMBO, GOOGLE_SHEET_CSV_URL_OTHER } from '../constants';
+import { fetchLandPlots } from '../services/dataService';
+import { LandPlot } from '../types';
 
 export const ProjectsPage: React.FC = () => {
-  return (
-    <div className="pt-24 pb-16 bg-gray-50">
-      <div className="container mx-auto px-6">
-        <h1 className="text-4xl font-bold text-navy-900 mb-8 font-serif text-center">Thái Thành Bom Bo</h1>
-        
-        {/* Hero Section */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-12">
-          <img 
-            src={PROJECT_HERO_IMAGE}
-            alt="Thái Thành Bom Bo" 
-            className="w-full h-auto"
-            referrerPolicy="no-referrer"
-          />
-          <div className="p-8">
-            <h2 className="text-2xl font-bold text-navy-900 mb-4">Thời cơ vàng đầu tư bất động sản Bù Đăng – Bình Phước</h2>
-            <p className="text-gray-600 leading-relaxed">
-              Dự án Thái Thành – Bom Bo được chủ đầu tư Thái Thành triển khai tại trung tâm hành chính mới của vùng đô thị du lịch Bom Bo.
-            </p>
+  const [bomboPlots, setBomboPlots] = useState<LandPlot[]>([]);
+  const [otherPlots, setOtherPlots] = useState<LandPlot[]>([]);
+  const [view, setView] = useState<'overview' | 'bombo' | 'other'>('overview');
+  const [currentPage, setCurrentPage] = useState(1);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadData = async () => {
+      const bombo = await fetchLandPlots(GOOGLE_SHEET_CSV_URL_BOMBO);
+      const other = await fetchLandPlots(GOOGLE_SHEET_CSV_URL_OTHER);
+      setBomboPlots(bombo);
+      setOtherPlots(other);
+    };
+    loadData();
+  }, []);
+
+  if (view === 'overview') {
+    return (
+      <div className="pt-24 pb-16 bg-gray-50 min-h-screen">
+        <div className="container mx-auto px-6">
+          <h1 className="text-4xl font-bold text-navy-900 mb-12 font-serif text-center">SẢN PHẨM</h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <div 
+              className="bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-shadow"
+              onClick={() => setView('bombo')}
+            >
+              <img src={PROJECT_HERO_IMAGE} alt="Thái Thành Bom Bo" className="w-full h-64 object-cover" />
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-navy-900 mb-2">Thái Thành Bom Bo</h2>
+                <p className="text-gray-600">Xem danh sách các lô đất tại dự án Thái Thành Bom Bo.</p>
+              </div>
+            </div>
+            <div 
+              className="bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-shadow"
+              onClick={() => setView('other')}
+            >
+              <img src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80" alt="Sản phẩm khác" className="w-full h-64 object-cover" />
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-navy-900 mb-2">Sản phẩm khác</h2>
+                <p className="text-gray-600">Xem danh sách các sản phẩm bất động sản khác.</p>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Detailed Sections */}
-        <div className="space-y-12">
-          <section className="bg-white p-8 rounded-xl shadow-sm">
-            <h3 className="text-2xl font-bold text-navy-900 mb-6 border-b pb-2">Tổng quan dự án</h3>
-            <p className="text-gray-600 leading-relaxed">
-              Dự án Thái Thành Bom Bo mang đến cơ hội đầu tư hấp dẫn tại Bù Đăng, Bình Phước. Với vị trí chiến lược và quy hoạch bài bản, đây là điểm đến lý tưởng cho các nhà đầu tư và cư dân tương lai.
-            </p>
-          </section>
-          
-          <section className="bg-white p-8 rounded-xl shadow-sm">
-            <h3 className="text-2xl font-bold text-navy-900 mb-6 border-b pb-2">Vị trí dự án: “Trái tim mới” của đô thị du lịch Bom Bo</h3>
-            <p className="text-gray-600 leading-relaxed">
-              Tọa lạc tại vị trí đắc địa, dự án kết nối giao thông thuận tiện, thừa hưởng hạ tầng đồng bộ và tiềm năng tăng giá cao trong tương lai.
-            </p>
-          </section>
+  const plots = view === 'bombo' ? bomboPlots : otherPlots;
+  const title = view === 'bombo' ? 'Thái Thành Bom Bo' : 'Sản phẩm khác';
+  const url = view === 'bombo' ? GOOGLE_SHEET_CSV_URL_BOMBO : GOOGLE_SHEET_CSV_URL_OTHER;
+  
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(plots.length / itemsPerPage);
+  const paginatedPlots = plots.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-          <section className="bg-white p-8 rounded-xl shadow-sm">
-            <h3 className="text-2xl font-bold text-navy-900 mb-6 border-b pb-2">Tiện ích dự án: Không gian sống chuẩn chất</h3>
-            <ul className="list-disc list-inside text-gray-600 space-y-2">
-              <li>Sống cân bằng giữa thiên nhiên nguyên bản</li>
-              <li>Kiến tạo phong cách sống thịnh vượng</li>
-              <li>Nhịp sống sôi động trong “Xứ sở cồng chiêng”</li>
-              <li>Sống văn minh – an toàn</li>
-              <li>Lợi thế “kép” từ hệ tiện ích ngoại khu đa dạng</li>
-            </ul>
-          </section>
+  return (
+    <div className="pt-24 pb-16 bg-gray-50 min-h-screen">
+      <div className="container mx-auto px-6">
+        <button onClick={() => { setView('overview'); setCurrentPage(1); }} className="mb-8 text-navy-900 font-bold hover:text-gold-500">← Quay lại</button>
+        <h1 className="text-4xl font-bold text-navy-900 mb-8 font-serif text-center">{title}</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {paginatedPlots.map(plot => (
+            <div key={plot.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+              <img src={plot.images[0] || "https://picsum.photos/400/300"} alt={`Lô ${plot.id}`} className="w-full h-48 object-cover rounded-lg mb-4" referrerPolicy="no-referrer" />
+              <h4 className="font-bold text-lg mb-2">Lô: {plot.id}</h4>
+              <p>Diện tích: {plot.area} m²</p>
+              <p>Giá: {plot.totalPrice.toLocaleString('vi-VN')} VNĐ</p>
+              <Link to={`/plot/${plot.id}?url=${encodeURIComponent(url)}`} className="text-blue-600 hover:underline mt-auto pt-2">Xem chi tiết</Link>
+            </div>
+          ))}
         </div>
+        {totalPages > 1 && (
+          <div className="flex justify-center mt-12 gap-2">
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button 
+                key={i} 
+                onClick={() => setCurrentPage(i + 1)}
+                className={`px-4 py-2 rounded ${currentPage === i + 1 ? 'bg-navy-900 text-white' : 'bg-white border'}`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

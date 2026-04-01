@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Calculator, Calendar, Download, Info } from 'lucide-react';
+import { Calculator, Calendar, Download, Info, X, ExternalLink, FileText, Table } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Types
 type CalculationMethod = 'declining' | 'original';
@@ -16,6 +18,28 @@ interface PaymentScheduleItem {
   remainingBalance: number;
 }
 
+interface BankRate {
+  name: string;
+  logo: string;
+  preferentialRate: number;
+  normalRate: number;
+  term: string;
+  maxLoan: string;
+}
+
+const bankRates: BankRate[] = [
+  { name: 'Vietcombank', logo: 'VCB', preferentialRate: 7.0, normalRate: 10.5, term: '12 tháng', maxLoan: '70%' },
+  { name: 'BIDV', logo: 'BIDV', preferentialRate: 7.2, normalRate: 10.7, term: '12 tháng', maxLoan: '80%' },
+  { name: 'VietinBank', logo: 'VTB', preferentialRate: 7.1, normalRate: 10.6, term: '12 tháng', maxLoan: '75%' },
+  { name: 'Agribank', logo: 'AGR', preferentialRate: 7.0, normalRate: 10.5, term: '12 tháng', maxLoan: '80%' },
+  { name: 'Techcombank', logo: 'TCB', preferentialRate: 7.5, normalRate: 11.5, term: '12 tháng', maxLoan: '70%' },
+  { name: 'VPBank', logo: 'VPB', preferentialRate: 7.9, normalRate: 12.0, term: '12 tháng', maxLoan: '85%' },
+  { name: 'MB Bank', logo: 'MB', preferentialRate: 7.4, normalRate: 11.0, term: '12 tháng', maxLoan: '80%' },
+  { name: 'ACB', logo: 'ACB', preferentialRate: 7.3, normalRate: 10.8, term: '12 tháng', maxLoan: '75%' },
+  { name: 'VIB', logo: 'VIB', preferentialRate: 8.5, normalRate: 12.5, term: '12 tháng', maxLoan: '80%' },
+  { name: 'TPBank', logo: 'TPB', preferentialRate: 7.8, normalRate: 11.8, term: '12 tháng', maxLoan: '75%' },
+];
+
 export const InterestRatePage: React.FC = () => {
   // State
   const [loanAmount, setLoanAmount] = useState<string>('1000000000');
@@ -27,6 +51,8 @@ export const InterestRatePage: React.FC = () => {
   const [preferentialTermMonths, setPreferentialTermMonths] = useState<string>('12');
   
   const [calculationMethod, setCalculationMethod] = useState<CalculationMethod>('declining');
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
   // Format currency
   const formatCurrency = (value: number) => {
@@ -120,10 +146,17 @@ export const InterestRatePage: React.FC = () => {
   const handleExportPDF = () => {
     const doc = new jsPDF();
     
-    doc.addFont('Helvetica', 'Helvetica', 'normal');
-    doc.setFont('Helvetica');
+    // Add title
+    doc.setFontSize(18);
+    doc.text('LICH TRA NO CHI TIET', 105, 15, { align: 'center' });
     
-    doc.text('Lich tra no chi tiet', 14, 15);
+    // Add loan summary
+    doc.setFontSize(12);
+    doc.text(`So tien vay: ${formatCurrency(parseNumber(loanAmount))}`, 14, 25);
+    doc.text(`Thoi han vay: ${loanTermYears} nam`, 14, 32);
+    doc.text(`Lai suat: ${interestRate}%/nam`, 14, 39);
+    doc.text(`Tong lai: ${formatCurrency(summary.totalInterest)}`, 14, 46);
+    doc.text(`Tong thanh toan: ${formatCurrency(summary.totalPayment)}`, 14, 53);
     
     const tableColumn = ["Ky tra no", "Du no dau ky", "Goc phai tra", "Lai phai tra", "Tong thanh toan", "Du no con lai"];
     const tableRows = schedule.map(item => [
@@ -138,16 +171,35 @@ export const InterestRatePage: React.FC = () => {
     (doc as any).autoTable({
       head: [tableColumn],
       body: tableRows,
-      startY: 25,
-      styles: { font: 'Helvetica' },
+      startY: 60,
+      styles: { fontSize: 8 },
       headStyles: { fillColor: [59, 130, 246] }
     });
 
     doc.save('lich_tra_no.pdf');
+    setIsExportMenuOpen(false);
+  };
+
+  const handleExportExcel = () => {
+    const data = schedule.map(item => ({
+      'Kỳ trả nợ': `Tháng ${item.month}`,
+      'Dư nợ đầu kỳ': Math.round(item.beginningBalance),
+      'Gốc phải trả': Math.round(item.principalPayment),
+      'Lãi phải trả': Math.round(item.interestPayment),
+      'Tổng thanh toán': Math.round(item.totalPayment),
+      'Dư nợ còn lại': Math.round(item.remainingBalance)
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Lịch trả nợ");
+    XLSX.writeFile(wb, "lich_tra_no.xlsx");
+    setIsExportMenuOpen(false);
   };
 
   const handlePrint = () => {
     window.print();
+    setIsExportMenuOpen(false);
   };
 
   return (
@@ -159,7 +211,23 @@ export const InterestRatePage: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column - Inputs */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className="lg:col-span-4 space-y-6 no-print">
+          <div 
+            onClick={() => setIsBankModalOpen(true)}
+            className="bg-blue-50 border border-blue-200 p-4 rounded-xl cursor-pointer hover:bg-blue-100 transition-colors flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500 rounded-lg text-white">
+                <Info className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-blue-800 font-bold text-sm">Thông tin lãi suất các ngân hàng</p>
+                <p className="text-blue-600 text-xs">Cập nhật tháng 04/2026</p>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-blue-400 group-hover:text-blue-600 transition-colors" />
+          </div>
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center gap-2 mb-6">
               <Calculator className="w-5 h-5 text-blue-500" />
@@ -424,14 +492,54 @@ export const InterestRatePage: React.FC = () => {
             <Calendar className="w-5 h-5 text-blue-500" />
             <h2 className="text-lg font-semibold text-gray-800">Lịch trả nợ chi tiết</h2>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 relative no-print">
             <button 
-              onClick={handlePrint}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors"
+              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-sm"
             >
               <Download className="w-4 h-4" />
-              Xuất PDF / In
+              Xuất dữ liệu
             </button>
+
+            <AnimatePresence>
+              {isExportMenuOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-20" 
+                    onClick={() => setIsExportMenuOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-30 py-2"
+                  >
+                    <button
+                      onClick={handleExportPDF}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    >
+                      <FileText className="w-4 h-4 text-red-500" />
+                      Xuất file PDF
+                    </button>
+                    <button
+                      onClick={handleExportExcel}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    >
+                      <Table className="w-4 h-4 text-green-600" />
+                      Xuất file Excel
+                    </button>
+                    <div className="h-px bg-gray-100 my-1" />
+                    <button
+                      onClick={handlePrint}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    >
+                      <Calculator className="w-4 h-4 text-gray-500" />
+                      In lịch trả nợ
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         </div>
         
@@ -474,6 +582,106 @@ export const InterestRatePage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Bank Rates Modal */}
+      <AnimatePresence>
+        {isBankModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsBankModalOpen(false)}
+              className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+            >
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-blue-600 text-white">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <Info className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Lãi suất vay các ngân hàng</h3>
+                    <p className="text-blue-100 text-xs">Cập nhật mới nhất tháng 04/2026</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsBankModalOpen(false)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left text-gray-500">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-4 font-bold">Ngân hàng</th>
+                        <th className="px-6 py-4 font-bold text-center">Lãi suất ưu đãi</th>
+                        <th className="px-6 py-4 font-bold text-center">Lãi suất sau ưu đãi</th>
+                        <th className="px-6 py-4 font-bold text-center">Thời gian ưu đãi</th>
+                        <th className="px-6 py-4 font-bold text-center">Vay tối đa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {bankRates.map((bank, index) => (
+                        <tr 
+                          key={index} 
+                          className="hover:bg-blue-50/50 transition-colors cursor-pointer"
+                          onClick={() => {
+                            setPreferentialRate(bank.preferentialRate.toString());
+                            setInterestRate(bank.normalRate.toString());
+                            setPreferentialTermMonths('12');
+                            setIsBankModalOpen(false);
+                          }}
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center font-bold text-blue-600 text-xs">
+                                {bank.logo}
+                              </div>
+                              <span className="font-bold text-gray-900">{bank.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full font-bold">
+                              {bank.preferentialRate}%
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center font-medium text-gray-700">
+                            {bank.normalRate}%
+                          </td>
+                          <td className="px-6 py-4 text-center text-gray-600">
+                            {bank.term}
+                          </td>
+                          <td className="px-6 py-4 text-center text-gray-600">
+                            {bank.maxLoan}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-6 p-4 bg-amber-50 border border-amber-100 rounded-xl flex gap-3">
+                  <Info className="w-5 h-5 text-amber-600 shrink-0" />
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    * Lưu ý: Bảng lãi suất trên chỉ mang tính chất tham khảo. Lãi suất thực tế có thể thay đổi tùy theo từng thời điểm, khu vực và điều kiện hồ sơ của khách hàng. Vui lòng liên hệ trực tiếp ngân hàng để có thông tin chính xác nhất. 
+                    <br />
+                    <strong>Mẹo:</strong> Nhấp vào một ngân hàng để tự động áp dụng lãi suất vào bảng tính.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

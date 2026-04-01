@@ -1,27 +1,33 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { LandPlot } from '../types';
 import { getPlotById } from '../services/dataService';
 import { generatePlotAnalysis } from '../services/geminiService';
 import { MakeOfferPopup } from '../components/MakeOfferPopup';
 import { useVisitorTracker } from '../hooks/useVisitorTracker';
+import { GOOGLE_SHEET_CSV_URL_BOMBO } from '../constants';
 
 export const DetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  useVisitorTracker(id);
+  const { search } = useLocation();
+  const query = new URLSearchParams(search);
+  const url = query.get('url') || undefined;
+
+  useVisitorTracker(id || '');
   const [plot, setPlot] = useState<LandPlot | null>(null);
   const [loading, setLoading] = useState(true);
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
   const [loadingAi, setLoadingAi] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
   const [showPopup, setShowPopup] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     window.scrollTo(0, 0);
     if (!id) return;
     
     setLoading(true);
-    getPlotById(id)
+    getPlotById(id, url)
       .then(foundPlot => {
         setPlot(foundPlot || null);
         if (foundPlot) {
@@ -40,7 +46,7 @@ export const DetailPage: React.FC = () => {
         }
       })
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, url]);
 
   if (loading) {
      return (
@@ -55,7 +61,7 @@ export const DetailPage: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-800">Không tìm thấy thông tin mã nền: {id}</h2>
-          <Link to="/" className="text-gold-600 hover:underline mt-4 block">Quay lại trang chủ</Link>
+          <button onClick={() => navigate(-1)} className="text-gold-600 hover:underline mt-4 block">Quay lại</button>
         </div>
       </div>
     );
@@ -73,6 +79,10 @@ export const DetailPage: React.FC = () => {
       {/* Header Info */}
       <div className="bg-white shadow-sm border-b border-gray-100">
         <div className="container mx-auto px-6 py-8">
+          <button onClick={() => navigate(-1)} className="mb-4 text-navy-900 font-bold hover:text-gold-500 flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            Quay lại
+          </button>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
             <div>
               <div className="flex items-center gap-3 mb-2">
