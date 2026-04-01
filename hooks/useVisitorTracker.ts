@@ -1,18 +1,39 @@
 import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 
-export const useVisitorTracker = (plotId?: string) => {
+// Module-level variable to prevent duplicate tracking across unmounts/remounts in StrictMode
+let globalLastTrackedUrl = '';
+
+export const useVisitorTracker = () => {
+  const location = useLocation();
+
   useEffect(() => {
+    const currentUrl = location.pathname + location.search;
+    
+    // Prevent duplicate tracking for the exact same URL in a short time
+    if (globalLastTrackedUrl === currentUrl) {
+      return;
+    }
+    globalLastTrackedUrl = currentUrl;
+
     const visitorId = localStorage.getItem('visitorId') || crypto.randomUUID();
     localStorage.setItem('visitorId', visitorId);
+
+    // Extract plotId from URL if present (e.g., /plot/E09)
+    let plotId: string | undefined;
+    const match = location.pathname.match(/^\/plot\/([a-zA-Z0-9]+)$/i);
+    if (match && match[1]) {
+      plotId = match[1].toUpperCase();
+    }
 
     const trackVisitor = async () => {
       const visitorRef = doc(db, 'visitor_logs', visitorId);
       const visitorSnap = await getDoc(visitorRef);
 
       const pageHistoryEntry = {
-        pageUrl: window.location.pathname,
+        pageUrl: currentUrl,
         timestamp: new Date().toISOString(),
       };
 
@@ -35,7 +56,7 @@ export const useVisitorTracker = (plotId?: string) => {
     };
 
     trackVisitor();
-  }, [plotId]);
+  }, [location.pathname, location.search]);
 };
 
 export const updateVisitorInfo = async (visitorId: string, name?: string, phone?: string) => {
