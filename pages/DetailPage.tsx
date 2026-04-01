@@ -16,10 +16,6 @@ export const DetailPage: React.FC = () => {
   const [activeImage, setActiveImage] = useState(0);
   const [showPopup, setShowPopup] = useState(false);
 
-  const HIDE_PRICE_ABOVE = 10000000000; // 10 tỷ
-  const HOTLINE = '0969 320 229';
-  const ZALO = '0969 320 229';
-
   useEffect(() => {
     window.scrollTo(0, 0);
     if (!id) return;
@@ -72,13 +68,6 @@ export const DetailPage: React.FC = () => {
     return 'bg-gray-50';
   };
 
-  const displayPrice = (price: number) => {
-    if (HIDE_PRICE_ABOVE > 0 && price > HIDE_PRICE_ABOVE) {
-      return 'Liên hệ';
-    }
-    return `${new Intl.NumberFormat('vi-VN').format(price)} VNĐ`;
-  };
-
   return (
     <div className={`${getStatusBgColor(plot.status)} pb-20 pt-20 min-h-screen`}>
       {/* Header Info */}
@@ -109,27 +98,16 @@ export const DetailPage: React.FC = () => {
                </span>
                <div className="flex flex-col md:items-end mt-2">
                  <span className="text-2xl md:text-3xl font-bold text-gold-600">
-                   {displayPrice(plot.totalPrice)}
+                   {new Intl.NumberFormat('vi-VN').format(plot.totalPrice)} VNĐ
                  </span>
-                 {displayPrice(plot.totalPrice) !== 'Liên hệ' && (
-                   <span className="text-sm text-gray-400 font-normal">({new Intl.NumberFormat('vi-VN').format(plot.pricePerM2)} triệu/m2)</span>
-                 )}
+                 <span className="text-sm text-gray-400 font-normal">({new Intl.NumberFormat('vi-VN').format(plot.pricePerM2)} triệu/m2)</span>
                </div>
-               <div className="flex flex-col gap-2 mt-4 w-full md:w-auto">
-                 <button 
-                   onClick={() => setShowPopup(true)}
-                   className="bg-gold-500 text-white px-8 py-3 rounded-full font-bold hover:bg-gold-600 transition-colors"
-                 >
-                   Trả giá
-                 </button>
-                 <Link 
-                   to="/ar-demo"
-                   className="bg-navy-900 text-white px-8 py-3 rounded-full font-bold hover:bg-gold-500 transition-colors flex items-center justify-center gap-2"
-                 >
-                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" /></svg>
-                   Xem AR (Demo)
-                 </Link>
-               </div>
+               <button 
+                 onClick={() => setShowPopup(true)}
+                 className="mt-4 w-full md:w-auto bg-gold-500 text-white px-8 py-3 rounded-full font-bold hover:bg-gold-600 transition-colors"
+               >
+                 Trả giá
+               </button>
             </div>
           </div>
         </div>
@@ -276,14 +254,14 @@ export const DetailPage: React.FC = () => {
               
               <div className="mt-8">
                 <a 
-                  href={`https://zalo.me/${ZALO.replace(/\s/g, '')}`} 
+                  href="https://zalo.me/0969320229" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="block w-full bg-navy-900 text-white py-4 rounded-lg font-bold text-center hover:bg-gold-500 transition-all shadow-lg transform hover:-translate-y-1"
                 >
                   LIÊN HỆ TƯ VẤN NGAY
                 </a>
-                <p className="text-center text-xs text-gray-400 mt-2">Hotline hỗ trợ 24/7: {HOTLINE}</p>
+                <p className="text-center text-xs text-gray-400 mt-2">Hotline hỗ trợ 24/7: 0969 320 229</p>
               </div>
             </div>
 

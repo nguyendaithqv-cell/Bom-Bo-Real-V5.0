@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { db, auth } from '../firebase';
-import { collection, query, orderBy, onSnapshot, getDoc, doc, deleteDoc, updateDoc, setDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, getDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
 import { fetchLandPlots } from '../services/dataService';
 import { analyzeVisitorBehavior } from '../services/geminiService';
 import { LandPlot } from '../types';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, Cell, PieChart, Pie
-} from 'recharts';
 
 enum OperationType {
   CREATE = 'create',
@@ -118,41 +115,6 @@ interface VisitorLog {
   potentialScore?: number;
 }
 
-interface AppSettings {
-  ai: {
-    greeting: string;
-    personality: string;
-    priorityKnowledge: string;
-  };
-  recruitment: {
-    isHiring: boolean;
-    staffCount: number;
-    recruitmentLink: string;
-  };
-  contact: {
-    hotline: string;
-    zalo: string;
-    facebook: string;
-    address: string;
-  };
-  notifications: {
-    email: string;
-    telegramToken: string;
-    telegramChatId: string;
-    enableSound: boolean;
-  };
-  policy: {
-    showHotLabel: boolean;
-    showCheapLabel: boolean;
-    hidePriceAbove: number;
-    defaultDiscount: number;
-  };
-  security: {
-    adminPassword: string;
-    staffCanDelete: boolean;
-  };
-}
-
 const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, setActiveTab: (t: string) => void, onLogout: () => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const tabs = [
@@ -187,6 +149,11 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
     </div>
   );
 };
+
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  BarChart, Bar, Cell, PieChart, Pie
+} from 'recharts';
 
 const AnalyticsView = ({ visitors, plots, offers }: { visitors: VisitorLog[], plots: LandPlot[], offers: Offer[] }) => {
   const [timeRange, setTimeRange] = useState<'7days' | 'month' | 'quarter' | 'year'>('7days');
@@ -501,12 +468,8 @@ export const AdminPage: React.FC = () => {
     else console.error('Mật khẩu không đúng!');
   };
 
-  const handleLogout = async () => {
-    try {
-      setIsAuthenticated(false);
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+  const handleLogout = () => {
+    setIsAuthenticated(false);
   };
 
   const handleDelete = async (collectionName: string, id: string) => {
@@ -627,12 +590,7 @@ export const AdminPage: React.FC = () => {
     };
     loadPlots();
 
-    return () => { 
-      unsubscribe(); 
-      unsubscribeOffers(); 
-      unsubscribeContacts(); 
-      unsubscribeVisitors(); 
-    };
+    return () => { unsubscribe(); unsubscribeOffers(); unsubscribeContacts(); unsubscribeVisitors(); };
   }, [isAuthenticated]);
 
   // Real-time notifications
@@ -673,33 +631,10 @@ export const AdminPage: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-[50vh] space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-navy-900 font-serif mb-2">Đăng nhập Admin</h1>
-          <p className="text-gray-500 text-sm">Vui lòng đăng nhập để quản lý hệ thống</p>
-        </div>
-        
-        <div className="w-full max-w-sm bg-white p-8 rounded-2xl shadow-xl border border-gray-100 space-y-6">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Mật khẩu hệ thống</label>
-              <input 
-                type="password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-                placeholder="Nhập mật khẩu" 
-                className="w-full border rounded-lg p-3 bg-gray-50 focus:ring-2 focus:ring-gold-500 outline-none" 
-              />
-            </div>
-            <button 
-              onClick={handleLogin} 
-              className="w-full bg-navy-900 text-white py-3 rounded-lg font-bold hover:bg-navy-800 transition-all shadow-lg"
-            >
-              Tiếp tục
-            </button>
-          </div>
-        </div>
+      <div className="p-6 flex flex-col items-center justify-center min-h-[50vh]">
+        <h1 className="text-2xl font-bold mb-4">Đăng nhập Admin</h1>
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Nhập mật khẩu" className="border p-2 rounded mb-4" />
+        <button onClick={handleLogin} className="bg-navy-900 text-white px-4 py-2 rounded">Đăng nhập</button>
       </div>
     );
   }
@@ -1344,9 +1279,7 @@ export const AdminPage: React.FC = () => {
     <div className="flex flex-col md:flex-row min-h-screen">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
       <div className="flex-grow p-4 md:p-8 bg-gray-100 overflow-y-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-          <h1 className="text-xl md:text-2xl font-bold capitalize">{activeTab}</h1>
-        </div>
+        <h1 className="text-xl md:text-2xl font-bold mb-6 capitalize">{activeTab}</h1>
         {renderContent()}
       </div>
     </div>
