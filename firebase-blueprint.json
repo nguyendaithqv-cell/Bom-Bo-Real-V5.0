@@ -76,9 +76,39 @@
         "description": { "type": "string" },
         "images": { "type": "array", "items": { "type": "string" } },
         "status": { "type": "string", "enum": ["pending", "contacted", "completed"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isRead": { "type": "boolean" }
       },
       "required": ["fullName", "phoneNumber", "propertyType", "address", "price", "createdAt"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "Contact form submissions.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isRead": { "type": "boolean" }
+      },
+      "required": ["name", "phone", "message", "createdAt"]
+    },
+    "Offer": {
+      "title": "Offer",
+      "description": "Price offers for land plots.",
+      "type": "object",
+      "properties": {
+        "plotId": { "type": "string" },
+        "originalPrice": { "type": "number" },
+        "offeredPrice": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isRead": { "type": "boolean" }
+      },
+      "required": ["plotId", "phone", "offeredPrice", "createdAt"]
     }
   },
   "firestore": {
@@ -94,9 +124,13 @@
       "schema": { "$ref": "Customer" },
       "description": "Stores customer contact information."
     },
-    "/appointments/{appointmentId}": {
-      "schema": { "$ref": "Appointment" },
-      "description": "Stores scheduled project viewing appointments."
+    "/contacts/{contactId}": {
+      "schema": { "$ref": "Contact" },
+      "description": "Stores contact form submissions."
+    },
+    "/offers/{offerId}": {
+      "schema": { "$ref": "Offer" },
+      "description": "Stores price offers for land plots."
     },
     "/visitor_logs/{visitorId}": {
       "schema": { "$ref": "VisitorLog" },
