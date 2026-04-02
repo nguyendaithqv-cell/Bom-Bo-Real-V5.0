@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../utils/firebaseErrors';
 
 // Module-level variable to prevent duplicate tracking across unmounts/remounts in StrictMode
 let globalLastTrackedUrl = '';
@@ -30,28 +31,32 @@ export const useVisitorTracker = () => {
 
     const trackVisitor = async () => {
       const visitorRef = doc(db, 'visitor_logs', visitorId);
-      const visitorSnap = await getDoc(visitorRef);
+      try {
+        const visitorSnap = await getDoc(visitorRef);
 
-      const pageHistoryEntry = {
-        pageUrl: currentUrl,
-        timestamp: new Date().toISOString(),
-      };
+        const pageHistoryEntry = {
+          pageUrl: currentUrl,
+          timestamp: new Date().toISOString(),
+        };
 
-      if (visitorSnap.exists()) {
-        await updateDoc(visitorRef, {
-          lastVisited: serverTimestamp(),
-          pageHistory: arrayUnion(pageHistoryEntry),
-          ...(plotId ? { viewedPlots: arrayUnion(plotId) } : {})
-        });
-      } else {
-        await setDoc(visitorRef, {
-          visitorId,
-          lastVisited: serverTimestamp(),
-          source: document.referrer,
-          device: navigator.userAgent,
-          viewedPlots: plotId ? [plotId] : [],
-          pageHistory: [pageHistoryEntry]
-        });
+        if (visitorSnap.exists()) {
+          await updateDoc(visitorRef, {
+            lastVisited: serverTimestamp(),
+            pageHistory: arrayUnion(pageHistoryEntry),
+            ...(plotId ? { viewedPlots: arrayUnion(plotId) } : {})
+          });
+        } else {
+          await setDoc(visitorRef, {
+            visitorId,
+            lastVisited: serverTimestamp(),
+            source: document.referrer,
+            device: navigator.userAgent,
+            viewedPlots: plotId ? [plotId] : [],
+            pageHistory: [pageHistoryEntry]
+          });
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `visitor_logs/${visitorId}`);
       }
     };
 
