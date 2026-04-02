@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { updateVisitorInfo, trackVisitorOffer } from '../hooks/useVisitorTracker';
+import { handleFirestoreError, OperationType } from '../utils/firebaseErrors';
 
 interface Props {
   plotId: string;
@@ -43,9 +44,8 @@ export const MakeOfferPopup: React.FC<Props> = ({ plotId, originalPrice, onClose
       }
 
       setShowSuccess(true);
-    } catch (e) {
-      console.error(e);
-      alert('Gửi yêu cầu thất bại! Vui lòng thử lại.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'offers');
     } finally {
       setLoading(false);
     }
