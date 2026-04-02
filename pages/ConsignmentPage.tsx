@@ -23,6 +23,7 @@ import {
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { updateVisitorInfo, trackVisitorConsignment } from '../hooks/useVisitorTracker';
+import { handleFirestoreError, OperationType } from '../utils/firebaseErrors';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -199,8 +200,7 @@ export const ConsignmentPage: React.FC = () => {
 
       setIsSuccess(true);
     } catch (error) {
-      console.error('Error submitting consignment:', error);
-      alert('Có lỗi xảy ra khi gửi thông tin. Vui lòng thử lại sau.');
+      handleFirestoreError(error, OperationType.CREATE, 'consignments');
     } finally {
       setIsSubmitting(false);
     }

@@ -1,55 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { fetchLandPlots } from '../services/dataService';
 import { analyzeVisitorBehavior } from '../services/geminiService';
 import { LandPlot } from '../types';
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: 'anonymous',
-      email: 'anonymous',
-      emailVerified: false,
-      isAnonymous: true,
-      tenantId: '',
-      providerInfo: []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
+import { handleFirestoreError, OperationType } from '../utils/firebaseErrors';
 
 interface Message {
   role: 'user' | 'ai';
@@ -63,6 +19,7 @@ interface Conversation {
   messages: Message[];
   message?: string;
   classification?: 'potential' | 'resale' | 'general';
+  isRead?: boolean;
 }
 
 const classifyConversation = (messages: Message[]): 'potential' | 'resale' | 'general' => {
@@ -80,6 +37,7 @@ interface Offer {
   name: string;
   phone: string;
   createdAt: any;
+  isRead?: boolean;
 }
 
 interface Contact {
@@ -89,6 +47,7 @@ interface Contact {
   phone: string;
   message: string;
   createdAt: any;
+  isRead?: boolean;
 }
 
 interface VisitorLog {
@@ -109,23 +68,29 @@ interface VisitorLog {
   reminders?: { text: string, date: string, completed: boolean }[];
   potentialScore?: number;
   lastConsignment?: { propertyType: string, address: string, price: number, timestamp: string };
+  isRead?: boolean;
 }
 
-const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
+const Sidebar = ({ activeTab, setActiveTab, unreadCounts, onLogout }: { 
+  activeTab: string, 
+  setActiveTab: (t: string) => void,
+  unreadCounts: Record<string, number>,
+  onLogout: () => void
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const tabs = [
     { id: 'dashboard', name: 'Trang Chủ' },
     { id: 'products', name: 'Sản phẩm' },
-    { id: 'chat', name: 'Chat Box AI' },
-    { id: 'customers', name: 'Danh Sách Khách Hàng' },
-    { id: 'visitors', name: 'Khách truy cập' },
-    { id: 'consignment', name: 'Yêu cầu Ký gửi' },
+    { id: 'chat', name: 'Chat Box AI', countKey: 'chat' },
+    { id: 'customers', name: 'Danh Sách Khách Hàng', countKey: 'chat' },
+    { id: 'visitors', name: 'Khách truy cập', countKey: 'visitors' },
+    { id: 'consignment', name: 'Yêu cầu Ký gửi', countKey: 'consignment' },
     { id: 'analytics', name: 'Thống kê & Báo cáo' },
     { id: 'office', name: 'Quản lý văn phòng' },
-    { id: 'potential', name: 'Khách Hàng Tiềm Năng' },
-    { id: 'resale', name: 'Khách Hàng Bán Lại' },
-    { id: 'offers', name: 'Danh Sách Trả Giá' },
-    { id: 'contacts', name: 'Tin Nhắn Liên Hệ' },
+    { id: 'potential', name: 'Khách Hàng Tiềm Năng', countKey: 'potential' },
+    { id: 'resale', name: 'Khách Hàng Bán Lại', countKey: 'resale' },
+    { id: 'offers', name: 'Danh Sách Trả Giá', countKey: 'offers' },
+    { id: 'contacts', name: 'Tin Nhắn Liên Hệ', countKey: 'contacts' },
   ];
   return (
     <div className="bg-navy-900 text-white p-4 flex-shrink-0">
@@ -135,10 +100,28 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
       </div>
       <div className={`${isOpen ? 'block' : 'hidden'} md:block mt-4 md:mt-0 space-y-2`}>
         {tabs.map(tab => (
-          <button key={tab.id} onClick={() => { setActiveTab(tab.id); setIsOpen(false); }} className={`block w-full text-left p-3 rounded ${activeTab === tab.id ? 'bg-gold-500' : 'hover:bg-navy-800'}`}>
-            {tab.name}
+          <button 
+            key={tab.id} 
+            onClick={() => { setActiveTab(tab.id); setIsOpen(false); }} 
+            className={`flex justify-between items-center w-full text-left p-3 rounded ${activeTab === tab.id ? 'bg-gold-500' : 'hover:bg-navy-800'}`}
+          >
+            <span>{tab.name}</span>
+            {tab.countKey && unreadCounts[tab.countKey] > 0 && (
+              <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                {unreadCounts[tab.countKey]}
+              </span>
+            )}
           </button>
         ))}
+        
+        <div className="pt-6 mt-6 border-t border-navy-700">
+          <button 
+            onClick={onLogout}
+            className="flex items-center gap-2 w-full text-left p-3 rounded text-red-400 hover:bg-red-900/30 hover:text-red-300 transition-all"
+          >
+            <span>🚪 Đăng xuất</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -456,6 +439,7 @@ export interface Consignment {
   images: string[];
   status: 'pending' | 'reviewed' | 'contacted' | 'completed' | 'rejected';
   createdAt: any;
+  isRead?: boolean;
 }
 
 const formatDate = (date: any) => {
@@ -476,7 +460,9 @@ const formatDate = (date: any) => {
 };
 
 export const AdminPage: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem('admin_auth') === 'true';
+  });
   const [password, setPassword] = useState('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -496,8 +482,17 @@ export const AdminPage: React.FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<{ collection: string, id: string } | null>(null);
 
   const handleLogin = () => {
-    if (password === '0969320229') setIsAuthenticated(true);
-    else console.error('Mật khẩu không đúng!');
+    if (password === '0969320229') {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('admin_auth', 'true');
+    } else {
+      alert('Mật khẩu không đúng!');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    sessionStorage.removeItem('admin_auth');
   };
 
   const handleDelete = async (collectionName: string, id: string) => {
@@ -565,7 +560,7 @@ export const AdminPage: React.FC = () => {
         setSelectedVisitor({ ...selectedVisitor, [field]: value });
       }
     } catch (error) {
-      console.error('CRM Update error:', error);
+      handleFirestoreError(error, OperationType.UPDATE, `visitor_logs/${visitorId}`);
     }
   };
 
@@ -576,7 +571,15 @@ export const AdminPage: React.FC = () => {
         setSelectedConsignment({ ...selectedConsignment, status: status as any });
       }
     } catch (error) {
-      console.error('Consignment Update error:', error);
+      handleFirestoreError(error, OperationType.UPDATE, `consignments/${consignmentId}`);
+    }
+  };
+
+  const markAsRead = async (collectionName: string, id: string) => {
+    try {
+      await updateDoc(doc(db, collectionName, id), { isRead: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${collectionName}/${id}`);
     }
   };
 
@@ -689,10 +692,31 @@ export const AdminPage: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-[50vh]">
-        <h1 className="text-2xl font-bold mb-4">Đăng nhập Admin</h1>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Nhập mật khẩu" className="border p-2 rounded mb-4" />
-        <button onClick={handleLogin} className="bg-navy-900 text-white px-4 py-2 rounded">Đăng nhập</button>
+      <div className="p-6 flex flex-col items-center justify-center min-h-[100vh] bg-gray-100">
+        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+          <h1 className="text-3xl font-bold mb-6 text-center text-navy-900">Admin Bom Bo Real</h1>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Mật khẩu hệ thống</label>
+              <input 
+                type="password" 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                placeholder="Nhập mật khẩu" 
+                className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none" 
+              />
+            </div>
+            
+            <button 
+              onClick={handleLogin} 
+              className="w-full bg-navy-900 text-white px-4 py-3 rounded-lg font-bold hover:bg-navy-800 transition-all"
+            >
+              Vào bảng điều khiển
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -702,6 +726,16 @@ export const AdminPage: React.FC = () => {
     if (activeTab === 'resale') return conv.classification === 'resale';
     return true;
   });
+
+  const unreadCounts = {
+    chat: conversations.filter(c => !c.isRead).length,
+    potential: conversations.filter(c => c.classification === 'potential' && !c.isRead).length,
+    resale: conversations.filter(c => c.classification === 'resale' && !c.isRead).length,
+    offers: offers.filter(o => !o.isRead).length,
+    contacts: contacts.filter(c => !c.isRead).length,
+    visitors: visitors.filter(v => !v.isRead).length,
+    consignment: consignments.filter(c => !c.isRead).length,
+  };
 
   const renderPagination = (totalItems: number) => {
     const totalPages = Math.ceil(totalItems / visitorsPerPage);
@@ -945,8 +979,20 @@ export const AdminPage: React.FC = () => {
             <div className="w-1/3 border-r flex flex-col">
               <div className="flex-grow overflow-y-auto">
                 {currentConvs.map(conv => (
-                  <div key={conv.id} onClick={() => setSelectedConv(conv)} className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedConv?.id === conv.id ? 'bg-gray-200' : ''}`}>
-                    <p className="font-bold truncate">Khách hàng {conv.id.slice(0, 5)}</p>
+                  <div 
+                    key={conv.id} 
+                    onClick={() => {
+                      setSelectedConv(conv);
+                      if (!conv.isRead) markAsRead('conversations', conv.id);
+                    }} 
+                    className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedConv?.id === conv.id ? 'bg-gray-200' : ''} ${!conv.isRead ? 'bg-blue-50' : ''}`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <p className={`truncate ${!conv.isRead ? 'font-black text-navy-900' : 'font-bold'}`}>
+                        Khách hàng {conv.id.slice(0, 5)}
+                      </p>
+                      {!conv.isRead && <span className="w-2 h-2 bg-blue-600 rounded-full"></span>}
+                    </div>
                     <p className="text-xs text-gray-500">{formatDate(conv.createdAt)}</p>
                     <span className={`text-xs px-2 py-1 rounded ${conv.classification === 'resale' ? 'bg-red-100 text-red-800' : conv.classification === 'potential' ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
                       {conv.classification === 'resale' ? 'Bán lại' : conv.classification === 'potential' ? 'Tiềm năng' : 'Thường'}
@@ -1002,8 +1048,20 @@ export const AdminPage: React.FC = () => {
             <div className="w-1/3 border-r flex flex-col">
               <div className="flex-grow overflow-y-auto">
                 {currentOffers.map(offer => (
-                  <div key={offer.id} onClick={() => setSelectedConv({ id: offer.id, userId: offer.name, createdAt: offer.createdAt, messages: [{role: 'user', text: JSON.stringify(offer)}] })} className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedConv?.id === offer.id ? 'bg-gray-200' : ''}`}>
-                    <p className="font-bold truncate">Trả giá: {offer.plotId} - {offer.name}</p>
+                  <div 
+                    key={offer.id} 
+                    onClick={() => {
+                      setSelectedConv({ id: offer.id, userId: offer.name, createdAt: offer.createdAt, messages: [{role: 'user', text: JSON.stringify(offer)}] });
+                      if (!offer.isRead) markAsRead('offers', offer.id);
+                    }} 
+                    className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedConv?.id === offer.id ? 'bg-gray-200' : ''} ${!offer.isRead ? 'bg-blue-50' : ''}`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <p className={`truncate ${!offer.isRead ? 'font-black text-navy-900' : 'font-bold'}`}>
+                        Trả giá: {offer.plotId} - {offer.name}
+                      </p>
+                      {!offer.isRead && <span className="w-2 h-2 bg-blue-600 rounded-full"></span>}
+                    </div>
                     <p className="text-xs text-gray-500">{formatDate(offer.createdAt)}</p>
                   </div>
                 ))}
@@ -1061,8 +1119,20 @@ export const AdminPage: React.FC = () => {
             <div className="w-1/3 border-r flex flex-col">
               <div className="flex-grow overflow-y-auto">
                 {currentContacts.map(contact => (
-                  <div key={contact.id} onClick={() => setSelectedConv({ id: contact.id, userId: contact.name, createdAt: contact.createdAt, messages: [{role: 'user', text: contact.message}] })} className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedConv?.id === contact.id ? 'bg-gray-200' : ''}`}>
-                    <p className="font-bold truncate">{contact.name}</p>
+                  <div 
+                    key={contact.id} 
+                    onClick={() => {
+                      setSelectedConv({ id: contact.id, userId: contact.name, createdAt: contact.createdAt, messages: [{role: 'user', text: contact.message}] });
+                      if (!contact.isRead) markAsRead('contacts', contact.id);
+                    }} 
+                    className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedConv?.id === contact.id ? 'bg-gray-200' : ''} ${!contact.isRead ? 'bg-blue-50' : ''}`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <p className={`truncate ${!contact.isRead ? 'font-black text-navy-900' : 'font-bold'}`}>
+                        {contact.name}
+                      </p>
+                      {!contact.isRead && <span className="w-2 h-2 bg-blue-600 rounded-full"></span>}
+                    </div>
                     <p className="text-xs text-gray-500 truncate">{contact.email}</p>
                   </div>
                 ))}
@@ -1118,17 +1188,30 @@ export const AdminPage: React.FC = () => {
             <div className={`${selectedVisitor ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r flex-col`}>
               <div className="flex-grow overflow-y-auto">
                 {currentVisitors.map(visitor => (
-                  <div key={visitor.id} onClick={() => { setSelectedVisitor(visitor); setPageHistoryCurrentPage(1); }} className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedVisitor?.id === visitor.id ? 'bg-gray-200' : ''}`}>
+                  <div 
+                    key={visitor.id} 
+                    onClick={() => { 
+                      setSelectedVisitor(visitor); 
+                      setPageHistoryCurrentPage(1); 
+                      if (!visitor.isRead) markAsRead('visitor_logs', visitor.id);
+                    }} 
+                    className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedVisitor?.id === visitor.id ? 'bg-gray-200' : ''} ${!visitor.isRead ? 'bg-blue-50' : ''}`}
+                  >
                     <div className="flex justify-between items-start">
                       <div className="flex-grow overflow-hidden">
-                        <p className="font-bold truncate">{visitor.name || 'Khách ẩn danh'}</p>
+                        <p className={`truncate ${!visitor.isRead ? 'font-black text-navy-900' : 'font-bold'}`}>
+                          {visitor.name || 'Khách ẩn danh'}
+                        </p>
                         <p className="text-xs text-gray-500 truncate">{visitor.phoneNumber || 'Không có SĐT'}</p>
                       </div>
-                      {visitor.potentialScore !== undefined && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ml-2 ${visitor.potentialScore > 70 ? 'bg-green-100 text-green-700' : 'bg-gold-100 text-gold-700'}`}>
-                          {visitor.potentialScore}
-                        </span>
-                      )}
+                      <div className="flex flex-col items-end">
+                        {!visitor.isRead && <span className="w-2 h-2 bg-blue-600 rounded-full mb-1"></span>}
+                        {visitor.potentialScore !== undefined && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${visitor.potentialScore > 70 ? 'bg-green-100 text-green-700' : 'bg-gold-100 text-gold-700'}`}>
+                            {visitor.potentialScore}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p className="text-[10px] text-gray-400 mt-1">{formatDate(visitor.lastVisited)}</p>
                     {visitor.status && (
@@ -1393,20 +1476,32 @@ export const AdminPage: React.FC = () => {
             <div className={`${selectedConsignment ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r flex-col`}>
               <div className="flex-grow overflow-y-auto">
                 {currentConsignments.map(consignment => (
-                  <div key={consignment.id} onClick={() => setSelectedConsignment(consignment)} className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedConsignment?.id === consignment.id ? 'bg-gray-200' : ''}`}>
+                  <div 
+                    key={consignment.id} 
+                    onClick={() => {
+                      setSelectedConsignment(consignment);
+                      if (!consignment.isRead) markAsRead('consignments', consignment.id);
+                    }} 
+                    className={`p-4 border-b cursor-pointer hover:bg-gray-100 ${selectedConsignment?.id === consignment.id ? 'bg-gray-200' : ''} ${!consignment.isRead ? 'bg-blue-50' : ''}`}
+                  >
                     <div className="flex justify-between items-start">
                       <div className="flex-grow overflow-hidden">
-                        <p className="font-bold truncate">{consignment.fullName || 'Khách ký gửi'}</p>
+                        <p className={`truncate ${!consignment.isRead ? 'font-black text-navy-900' : 'font-bold'}`}>
+                          {consignment.fullName || 'Khách ký gửi'}
+                        </p>
                         <p className="text-xs text-gray-500 truncate">{consignment.phoneNumber}</p>
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ml-2 ${
-                        consignment.status === 'completed' ? 'bg-green-100 text-green-700' :
-                        consignment.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                        consignment.status === 'pending' ? 'bg-gold-100 text-gold-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>
-                        {consignment.status}
-                      </span>
+                      <div className="flex flex-col items-end">
+                        {!consignment.isRead && <span className="w-2 h-2 bg-blue-600 rounded-full mb-1"></span>}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ${
+                          consignment.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          consignment.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                          consignment.status === 'pending' ? 'bg-gold-100 text-gold-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {consignment.status}
+                        </span>
+                      </div>
                     </div>
                     <p className="text-[10px] text-gray-400 mt-1">{formatDate(consignment.createdAt)}</p>
                     <p className="text-[10px] text-navy-600 mt-1 font-medium truncate">{consignment.address}</p>
@@ -1523,7 +1618,12 @@ export const AdminPage: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        unreadCounts={unreadCounts} 
+        onLogout={handleLogout}
+      />
       <div className="flex-grow p-4 md:p-8 bg-gray-100 overflow-y-auto">
         <h1 className="text-xl md:text-2xl font-bold mb-6 capitalize">{activeTab}</h1>
         {renderContent()}

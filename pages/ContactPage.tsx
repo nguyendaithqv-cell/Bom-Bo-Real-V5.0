@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Layout } from '../components/Layout';
 import { db } from '../firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../utils/firebaseErrors';
 
 export const ContactPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -11,6 +12,11 @@ export const ContactPage: React.FC = () => {
     message: ''
   });
   const [showSuccess, setShowSuccess] = useState(false);
+
+  const HOTLINE = '0969 320 229';
+  const ZALO = '0969 320 229';
+  const ADDRESS = 'Bình Phước, Việt Nam';
+  const FACEBOOK = 'https://facebook.com/bombreal';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +39,7 @@ export const ContactPage: React.FC = () => {
       setShowSuccess(true);
       setFormData({ name: '', email: '', phone: '', message: '' });
     } catch (error) {
-      console.error('Error adding contact:', error);
-      alert('Có lỗi xảy ra, vui lòng thử lại sau.');
+      handleFirestoreError(error, OperationType.CREATE, 'contacts');
     }
   };
 
@@ -48,9 +53,10 @@ export const ContactPage: React.FC = () => {
           <div className="bg-white p-8 rounded-xl shadow-sm">
             <h2 className="text-2xl font-bold text-navy-900 mb-6">Thông tin liên hệ</h2>
             <div className="space-y-4 text-gray-600">
-              <p><strong>Hotline:</strong> 0969 320 229</p>
-              <p><strong>Email:</strong> info.bomboreal@gmail.com</p>
-              <p><strong>Địa chỉ:</strong> Bom Bo Real, KĐT THÁI THÀNH BOM BO, Xã Bom Bo, Đồng Nai</p>
+              <p><strong>Hotline:</strong> {HOTLINE}</p>
+              <p><strong>Zalo:</strong> {ZALO}</p>
+              {FACEBOOK && <p><strong>Facebook:</strong> <a href={FACEBOOK} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Ghé thăm Fanpage</a></p>}
+              <p><strong>Địa chỉ:</strong> {ADDRESS}</p>
             </div>
             
             <div className="mt-8">
