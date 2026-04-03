@@ -109,6 +109,32 @@
         "isRead": { "type": "boolean" }
       },
       "required": ["plotId", "phone", "offeredPrice", "createdAt"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global application settings.",
+      "type": "object",
+      "properties": {
+        "showBombo": { "type": "boolean", "description": "Whether to show Thái Thành Bom Bo products." },
+        "showOther": { "type": "boolean", "description": "Whether to show other products." },
+        "hotline": { "type": "string", "description": "Main contact hotline." },
+        "zaloLink": { "type": "string", "description": "Link to Zalo contact." },
+        "facebookLink": { "type": "string", "description": "Link to Facebook page." },
+        "officeAddress": { "type": "string", "description": "Physical office address." },
+        "marqueeText": { "type": "string", "description": "Scrolling announcement text." },
+        "showMarquee": { "type": "boolean", "description": "Whether to show the marquee." },
+        "showPopup": { "type": "boolean", "description": "Whether to show a popup notification." },
+        "popupContent": { "type": "string", "description": "Content of the popup notification." },
+        "enableAIChat": { "type": "boolean", "description": "Enable/disable AI Chatbot." },
+        "enableConsignment": { "type": "boolean", "description": "Enable/disable Consignment feature." },
+        "enableOffers": { "type": "boolean", "description": "Enable/disable Price Offer feature." },
+        "heroImageUrl": { "type": "string", "description": "URL for the main hero image." },
+        "maintenanceMode": { "type": "boolean", "description": "Enable/disable maintenance mode." },
+        "telegramBotToken": { "type": "string", "description": "Telegram Bot API Token." },
+        "telegramChatId": { "type": "string", "description": "Telegram Chat ID to receive notifications." },
+        "enableTelegramNotify": { "type": "boolean", "description": "Enable/disable Telegram notifications." }
+      },
+      "required": ["showBombo", "showOther", "hotline", "enableAIChat", "enableConsignment", "enableOffers", "maintenanceMode", "enableTelegramNotify"]
     }
   },
   "firestore": {
@@ -135,6 +161,10 @@
     "/visitor_logs/{visitorId}": {
       "schema": { "$ref": "VisitorLog" },
       "description": "Tracks visitor activity and contact information."
+    },
+    "/app_settings/{settingId}": {
+      "schema": { "$ref": "AppSettings" },
+      "description": "Stores global application settings."
     }
   }
 }
