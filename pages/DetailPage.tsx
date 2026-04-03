@@ -5,6 +5,8 @@ import { getPlotById } from '../services/dataService';
 import { generatePlotAnalysis } from '../services/geminiService';
 import { MakeOfferPopup } from '../components/MakeOfferPopup';
 import { GOOGLE_SHEET_CSV_URL_BOMBO, GOOGLE_SHEET_CSV_URL_OTHER } from '../constants';
+import { db } from '../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 export const DetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +21,7 @@ export const DetailPage: React.FC = () => {
   const [loadingAi, setLoadingAi] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
   const [showPopup, setShowPopup] = useState(false);
+  const [settings, setSettings] = useState<any>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,6 +48,13 @@ export const DetailPage: React.FC = () => {
         }
       })
       .finally(() => setLoading(false));
+
+    const unsubscribe = onSnapshot(doc(db, 'app_settings', 'general'), (snapshot) => {
+      if (snapshot.exists()) {
+        setSettings(snapshot.data());
+      }
+    });
+    return () => unsubscribe();
   }, [id, url]);
 
   if (loading) {
@@ -111,12 +121,14 @@ export const DetailPage: React.FC = () => {
                  </span>
                  <span className="text-sm text-gray-400 font-normal">({new Intl.NumberFormat('vi-VN').format(plot.pricePerM2)} triệu/m2)</span>
                </div>
-               <button 
-                 onClick={() => setShowPopup(true)}
-                 className="mt-4 w-full md:w-auto bg-gold-500 text-white px-8 py-3 rounded-full font-bold hover:bg-gold-600 transition-colors"
-               >
-                 Trả giá
-               </button>
+               {settings?.enableOffers !== false && (
+                 <button 
+                   onClick={() => setShowPopup(true)}
+                   className="mt-4 w-full md:w-auto bg-gold-500 text-white px-8 py-3 rounded-full font-bold hover:bg-gold-600 transition-colors"
+                 >
+                   Trả giá
+                 </button>
+               )}
             </div>
           </div>
         </div>
@@ -263,14 +275,14 @@ export const DetailPage: React.FC = () => {
               
               <div className="mt-8">
                 <a 
-                  href="https://zalo.me/0969320229" 
+                  href={settings?.zaloLink || `https://zalo.me/${settings?.hotline?.replace(/\s/g, '') || '0969320229'}`} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="block w-full bg-navy-900 text-white py-4 rounded-lg font-bold text-center hover:bg-gold-500 transition-all shadow-lg transform hover:-translate-y-1"
                 >
                   LIÊN HỆ TƯ VẤN NGAY
                 </a>
-                <p className="text-center text-xs text-gray-400 mt-2">Hotline hỗ trợ 24/7: 0969 320 229</p>
+                <p className="text-center text-xs text-gray-400 mt-2">Hotline hỗ trợ 24/7: {settings?.hotline || '0969 320 229'}</p>
               </div>
             </div>
 

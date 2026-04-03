@@ -4,6 +4,7 @@ import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getD
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { fetchLandPlots } from '../services/dataService';
 import { analyzeVisitorBehavior } from '../services/geminiService';
+import { MessageSquare } from 'lucide-react';
 import { LandPlot } from '../types';
 import { handleFirestoreError, OperationType } from '../utils/firebaseErrors';
 
@@ -71,6 +72,27 @@ interface VisitorLog {
   isRead?: boolean;
 }
 
+interface AppSettings {
+  showBombo: boolean;
+  showOther: boolean;
+  hotline: string;
+  zaloLink?: string;
+  facebookLink?: string;
+  officeAddress?: string;
+  marqueeText?: string;
+  showMarquee?: boolean;
+  showPopup?: boolean;
+  popupContent?: string;
+  enableAIChat: boolean;
+  enableConsignment: boolean;
+  enableOffers: boolean;
+  heroImageUrl?: string;
+  maintenanceMode: boolean;
+  telegramBotToken?: string;
+  telegramChatId?: string;
+  enableTelegramNotify?: boolean;
+}
+
 const Sidebar = ({ activeTab, setActiveTab, unreadCounts, onLogout }: { 
   activeTab: string, 
   setActiveTab: (t: string) => void,
@@ -91,6 +113,7 @@ const Sidebar = ({ activeTab, setActiveTab, unreadCounts, onLogout }: {
     { id: 'resale', name: 'Khách Hàng Bán Lại', countKey: 'resale' },
     { id: 'offers', name: 'Danh Sách Trả Giá', countKey: 'offers' },
     { id: 'contacts', name: 'Tin Nhắn Liên Hệ', countKey: 'contacts' },
+    { id: 'settings', name: 'Cài đặt hệ thống' },
   ];
   return (
     <div className="bg-navy-900 text-white p-4 flex-shrink-0">
@@ -470,6 +493,15 @@ export const AdminPage: React.FC = () => {
   const [visitors, setVisitors] = useState<VisitorLog[]>([]);
   const [consignments, setConsignments] = useState<Consignment[]>([]);
   const [plots, setPlots] = useState<LandPlot[]>([]);
+  const [appSettings, setAppSettings] = useState<AppSettings>({ 
+    showBombo: true, 
+    showOther: true,
+    hotline: '0969320229',
+    enableAIChat: true,
+    enableConsignment: true,
+    enableOffers: true,
+    maintenanceMode: false
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorLog | null>(null);
@@ -575,6 +607,14 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  const handleUpdateSettings = async (newSettings: Partial<AppSettings>) => {
+    try {
+      await setDoc(doc(db, 'app_settings', 'general'), newSettings, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'app_settings/general');
+    }
+  };
+
   const markAsRead = async (collectionName: string, id: string) => {
     try {
       await updateDoc(doc(db, collectionName, id), { isRead: true });
@@ -641,7 +681,50 @@ export const AdminPage: React.FC = () => {
     };
     loadPlots();
 
-    return () => { unsubscribe(); unsubscribeOffers(); unsubscribeContacts(); unsubscribeVisitors(); unsubscribeConsignments(); };
+    const unsubscribeSettings = onSnapshot(doc(db, 'app_settings', 'general'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setAppSettings({
+          showBombo: data.showBombo ?? true,
+          showOther: data.showOther ?? true,
+          hotline: data.hotline ?? '0969320229',
+          zaloLink: data.zaloLink ?? '',
+          facebookLink: data.facebookLink ?? '',
+          officeAddress: data.officeAddress ?? '',
+          marqueeText: data.marqueeText ?? '',
+          showMarquee: data.showMarquee ?? false,
+          showPopup: data.showPopup ?? false,
+          popupContent: data.popupContent ?? '',
+          enableAIChat: data.enableAIChat ?? true,
+          enableConsignment: data.enableConsignment ?? true,
+          enableOffers: data.enableOffers ?? true,
+          heroImageUrl: data.heroImageUrl ?? '',
+          maintenanceMode: data.maintenanceMode ?? false,
+          telegramBotToken: data.telegramBotToken ?? '',
+          telegramChatId: data.telegramChatId ?? '',
+          enableTelegramNotify: data.enableTelegramNotify ?? false
+        });
+      } else {
+        setDoc(doc(db, 'app_settings', 'general'), { 
+          showBombo: true, 
+          showOther: true,
+          hotline: '0969320229',
+          enableAIChat: true,
+          enableConsignment: true,
+          enableOffers: true,
+          maintenanceMode: false
+        });
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'app_settings/general'));
+
+    return () => { 
+      unsubscribe(); 
+      unsubscribeOffers(); 
+      unsubscribeContacts(); 
+      unsubscribeVisitors(); 
+      unsubscribeConsignments(); 
+      unsubscribeSettings();
+    };
   }, [isAuthenticated]);
 
   // Real-time notifications
@@ -1611,6 +1694,263 @@ export const AdminPage: React.FC = () => {
         return <AnalyticsView visitors={visitors} plots={plots} offers={offers} />;
       case 'office':
         return <OfficeView visitors={visitors} />;
+      case 'settings':
+        return (
+          <div className="space-y-8 max-w-4xl">
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">1. Cấu hình hiển thị sản phẩm</h2>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div>
+                    <h3 className="font-bold text-navy-900">Hiển thị Thái Thành Bom Bo</h3>
+                    <p className="text-sm text-gray-500">Bật/tắt hiển thị danh sách sản phẩm Thái Thành Bom Bo</p>
+                  </div>
+                  <button 
+                    onClick={() => handleUpdateSettings({ showBombo: !appSettings.showBombo })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.showBombo ? 'bg-gold-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.showBombo ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div>
+                    <h3 className="font-bold text-navy-900">Hiển thị Sản phẩm khác</h3>
+                    <p className="text-sm text-gray-500">Bật/tắt hiển thị danh sách các sản phẩm bất động sản khác</p>
+                  </div>
+                  <button 
+                    onClick={() => handleUpdateSettings({ showOther: !appSettings.showOther })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.showOther ? 'bg-gold-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.showOther ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">2. Thông tin liên hệ</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Số Hotline</label>
+                  <input 
+                    type="text" 
+                    value={appSettings.hotline}
+                    onChange={(e) => handleUpdateSettings({ hotline: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Link Zalo</label>
+                  <input 
+                    type="text" 
+                    value={appSettings.zaloLink}
+                    onChange={(e) => handleUpdateSettings({ zaloLink: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Link Facebook</label>
+                  <input 
+                    type="text" 
+                    value={appSettings.facebookLink}
+                    onChange={(e) => handleUpdateSettings({ facebookLink: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Địa chỉ văn phòng</label>
+                  <input 
+                    type="text" 
+                    value={appSettings.officeAddress}
+                    onChange={(e) => handleUpdateSettings({ officeAddress: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">3. Thông báo & Quảng bá</h2>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div className="flex-grow mr-4">
+                    <h3 className="font-bold text-navy-900">Dòng chữ chạy (Marquee)</h3>
+                    <input 
+                      type="text" 
+                      placeholder="Nhập nội dung thông báo..."
+                      value={appSettings.marqueeText}
+                      onChange={(e) => handleUpdateSettings({ marqueeText: e.target.value })}
+                      className="w-full mt-2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => handleUpdateSettings({ showMarquee: !appSettings.showMarquee })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.showMarquee ? 'bg-gold-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.showMarquee ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div className="flex-grow mr-4">
+                    <h3 className="font-bold text-navy-900">Popup thông báo</h3>
+                    <textarea 
+                      placeholder="Nhập nội dung popup..."
+                      value={appSettings.popupContent}
+                      onChange={(e) => handleUpdateSettings({ popupContent: e.target.value })}
+                      className="w-full mt-2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none h-24"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => handleUpdateSettings({ showPopup: !appSettings.showPopup })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.showPopup ? 'bg-gold-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.showPopup ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">4. Quản lý tính năng</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-gray-50 rounded-xl flex flex-col items-center text-center">
+                  <span className="font-bold mb-2">Chatbot AI</span>
+                  <button 
+                    onClick={() => handleUpdateSettings({ enableAIChat: !appSettings.enableAIChat })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.enableAIChat ? 'bg-gold-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.enableAIChat ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-xl flex flex-col items-center text-center">
+                  <span className="font-bold mb-2">Ký gửi</span>
+                  <button 
+                    onClick={() => handleUpdateSettings({ enableConsignment: !appSettings.enableConsignment })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.enableConsignment ? 'bg-gold-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.enableConsignment ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-xl flex flex-col items-center text-center">
+                  <span className="font-bold mb-2">Trả giá</span>
+                  <button 
+                    onClick={() => handleUpdateSettings({ enableOffers: !appSettings.enableOffers })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.enableOffers ? 'bg-gold-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.enableOffers ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">5. Giao diện & Hệ thống</h2>
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Link ảnh nền (Hero Image)</label>
+                  <input 
+                    type="text" 
+                    placeholder="Dán link ảnh (https://...)"
+                    value={appSettings.heroImageUrl}
+                    onChange={(e) => handleUpdateSettings({ heroImageUrl: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4 bg-red-50 rounded-xl border border-red-100">
+                  <div>
+                    <h3 className="font-bold text-red-900">Chế độ bảo trì (Maintenance Mode)</h3>
+                    <p className="text-sm text-red-700">Khi bật, khách hàng sẽ không thể truy cập trang web</p>
+                  </div>
+                  <button 
+                    onClick={() => handleUpdateSettings({ maintenanceMode: !appSettings.maintenanceMode })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.maintenanceMode ? 'bg-red-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.maintenanceMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">6. Thông báo cho Admin (Telegram)</h2>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div>
+                    <h3 className="font-bold text-navy-900">Bật thông báo Telegram</h3>
+                    <p className="text-sm text-gray-500">Nhận tin nhắn báo ngay khi có khách liên hệ, trả giá hoặc ký gửi</p>
+                  </div>
+                  <button 
+                    onClick={() => handleUpdateSettings({ enableTelegramNotify: !appSettings.enableTelegramNotify })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.enableTelegramNotify ? 'bg-gold-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.enableTelegramNotify ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Bot Token</label>
+                    <input 
+                      type="password" 
+                      placeholder="Nhập Telegram Bot Token..."
+                      value={appSettings.telegramBotToken}
+                      onChange={(e) => handleUpdateSettings({ telegramBotToken: e.target.value })}
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Lấy từ @BotFather</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Chat ID</label>
+                    <input 
+                      type="text" 
+                      placeholder="Nhập Telegram Chat ID..."
+                      value={appSettings.telegramChatId}
+                      onChange={(e) => handleUpdateSettings({ telegramChatId: e.target.value })}
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Lấy từ @userinfobot</p>
+                  </div>
+                </div>
+                <div className="pt-4 border-t">
+                  <button 
+                    onClick={async () => {
+                      if (!appSettings.telegramBotToken || !appSettings.telegramChatId) {
+                        alert('Vui lòng điền đầy đủ Bot Token và Chat ID trước khi thử!');
+                        return;
+                      }
+                      try {
+                        const url = `https://api.telegram.org/bot${appSettings.telegramBotToken}/sendMessage`;
+                        const response = await fetch(url, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            chat_id: appSettings.telegramChatId,
+                            text: '<b>✅ THỬ NGHIỆM THÀNH CÔNG</b>\n\nChúc mừng! Hệ thống thông báo Telegram của Bom Bo Real đã được kết nối chính xác.',
+                            parse_mode: 'HTML'
+                          })
+                        });
+                        const data = await response.json();
+                        if (data.ok) {
+                          alert('Đã gửi tin nhắn thử nghiệm thành công! Hãy kiểm tra điện thoại của bạn.');
+                        } else {
+                          alert(`Lỗi từ Telegram: ${data.description}`);
+                        }
+                      } catch (err) {
+                        alert('Không thể kết nối tới Telegram API. Vui lòng kiểm tra lại Token.');
+                      }
+                    }}
+                    className="px-6 py-2 bg-navy-900 text-white rounded-lg font-bold hover:bg-navy-800 transition-colors flex items-center gap-2"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    Gửi thử tin nhắn
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
       default:
         return <div>Chức năng đang cập nhật</div>;
     }

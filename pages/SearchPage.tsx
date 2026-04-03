@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { PROJECT_HERO_IMAGE, GOOGLE_SHEET_CSV_URL_BOMBO, GOOGLE_SHEET_CSV_URL_OTHER } from '../constants';
 import { fetchLandPlots } from '../services/dataService';
 import { LandPlot } from '../types';
+import { db } from '../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 export const SearchPage: React.FC = () => {
   const [code, setCode] = useState('');
@@ -10,12 +12,23 @@ export const SearchPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [bomboPlots, setBomboPlots] = useState<LandPlot[]>([]);
   const [otherPlots, setOtherPlots] = useState<LandPlot[]>([]);
+  const [heroImage, setHeroImage] = useState(PROJECT_HERO_IMAGE);
   const navigate = useNavigate();
 
   // Pre-load data when page opens
   useEffect(() => {
     fetchLandPlots(GOOGLE_SHEET_CSV_URL_BOMBO).then(data => setBomboPlots(data));
     fetchLandPlots(GOOGLE_SHEET_CSV_URL_OTHER).then(data => setOtherPlots(data));
+
+    const unsubscribe = onSnapshot(doc(db, 'app_settings', 'general'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data.heroImageUrl) {
+          setHeroImage(data.heroImageUrl);
+        }
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -53,7 +66,7 @@ export const SearchPage: React.FC = () => {
       {/* Background Image with Overlay */}
       <div 
         className="absolute inset-0 bg-cover bg-center z-0 transform scale-105 transition-transform duration-[20s] hover:scale-100"
-        style={{ backgroundImage: `url(${PROJECT_HERO_IMAGE})` }}
+        style={{ backgroundImage: `url(${heroImage})` }}
       />
       <div className="absolute inset-0 bg-black/40 z-10" />
 

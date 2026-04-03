@@ -20,10 +20,11 @@ import {
   Info,
   AlertCircle
 } from 'lucide-react';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { updateVisitorInfo, trackVisitorConsignment } from '../hooks/useVisitorTracker';
 import { handleFirestoreError, OperationType } from '../utils/firebaseErrors';
+import { sendTelegramNotification } from '../services/notificationService';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -181,11 +182,25 @@ export const ConsignmentPage: React.FC = () => {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, 'consignments'), {
+      await addDoc(collection(db, 'consignments',), {
         ...formData,
         status: 'pending',
-        createdAt: new Date()
+        createdAt: serverTimestamp()
       });
+
+      // Send Telegram Notification
+      const telegramMessage = `<b>🏠 YÊU CẦU KÝ GỬI MỚI</b>\n\n` +
+                              `👤 <b>Chủ sở hữu:</b> ${formData.fullName}\n` +
+                              `📞 <b>SĐT:</b> ${formData.phoneNumber}\n` +
+                              `💬 <b>Zalo:</b> ${formData.zalo || 'N/A'}\n` +
+                              `🏢 <b>Loại hình:</b> ${formData.propertyType}\n` +
+                              `📍 <b>Địa chỉ:</b> ${formData.address}\n` +
+                              `💰 <b>Giá mong muốn:</b> ${formData.price} VNĐ\n` +
+                              `📐 <b>Diện tích:</b> ${formData.area}m2 (${formData.dimensions})\n` +
+                              `📜 <b>Pháp lý:</b> ${formData.legalStatus}\n` +
+                              `🧭 <b>Hướng:</b> ${formData.direction}\n` +
+                              `🖼️ <b>Số ảnh:</b> ${formData.images.length}`;
+      await sendTelegramNotification(telegramMessage);
 
       const visitorId = localStorage.getItem('visitorId');
       if (visitorId) {

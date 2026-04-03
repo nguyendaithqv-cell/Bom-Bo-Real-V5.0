@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
 import { db } from '../firebase';
-import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../utils/firebaseErrors';
+import { sendTelegramNotification } from '../services/notificationService';
 
 export const ContactPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -12,11 +13,21 @@ export const ContactPage: React.FC = () => {
     message: ''
   });
   const [showSuccess, setShowSuccess] = useState(false);
+  const [settings, setSettings] = useState<any>(null);
 
-  const HOTLINE = '0969 320 229';
-  const ZALO = '0969 320 229';
-  const ADDRESS = 'Bình Phước, Việt Nam';
-  const FACEBOOK = 'https://facebook.com/bombreal';
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'app_settings', 'general'), (snapshot) => {
+      if (snapshot.exists()) {
+        setSettings(snapshot.data());
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const HOTLINE = settings?.hotline || '0969 320 229';
+  const ZALO = settings?.hotline || '0969 320 229';
+  const ADDRESS = settings?.officeAddress || 'Bom Bo Real, KĐT THÁI THÀNH BOM BO, Xã Bom Bo, Đồng Nai';
+  const FACEBOOK = settings?.facebookLink || 'https://facebook.com/bombreal';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +36,14 @@ export const ContactPage: React.FC = () => {
         ...formData,
         createdAt: serverTimestamp()
       });
+
+      // Send Telegram Notification
+      const telegramMessage = `<b>📩 LIÊN HỆ MỚI TỪ WEBSITE</b>\n\n` +
+                              `👤 <b>Họ tên:</b> ${formData.name}\n` +
+                              `📞 <b>SĐT:</b> ${formData.phone}\n` +
+                              `📧 <b>Email:</b> ${formData.email || 'N/A'}\n` +
+                              `💬 <b>Nội dung:</b> ${formData.message}`;
+      await sendTelegramNotification(telegramMessage);
 
       // Update visitor info
       const visitorId = localStorage.getItem('visitorId');
