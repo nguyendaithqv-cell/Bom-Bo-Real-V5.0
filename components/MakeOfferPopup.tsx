@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { updateVisitorInfo, trackVisitorOffer } from '../hooks/useVisitorTracker';
 import { handleFirestoreError, OperationType } from '../utils/firebaseErrors';
+import { sendTelegramNotification } from '../services/notificationService';
 
 interface Props {
   plotId: string;
@@ -35,6 +36,15 @@ export const MakeOfferPopup: React.FC<Props> = ({ plotId, originalPrice, onClose
         phone,
         createdAt: serverTimestamp()
       });
+
+      // Send Telegram Notification
+      const message = `<b>🔔 YÊU CẦU TRẢ GIÁ MỚI</b>\n\n` +
+                      `📍 <b>Lô đất:</b> ${plotId}\n` +
+                      `💰 <b>Giá gốc:</b> ${new Intl.NumberFormat('vi-VN').format(originalPrice)} VNĐ\n` +
+                      `💸 <b>Giá trả:</b> ${price} VNĐ\n` +
+                      `👤 <b>Khách hàng:</b> ${name || 'Ẩn danh'}\n` +
+                      `📞 <b>SĐT:</b> ${phone}`;
+      await sendTelegramNotification(message);
 
       // Update visitor info
       const visitorId = localStorage.getItem('visitorId');

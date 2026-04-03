@@ -1,21 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChatWidget } from './ChatWidget';
 import { Home, Map, Newspaper, Settings, Phone, User, ChevronDown, Calculator, Ruler } from 'lucide-react';
+import { db } from '../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-const Navbar = () => {
+const Navbar = ({ settings }: { settings: any }) => {
   const location = useLocation();
   const isHome = location.pathname === '/';
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const [isUtilsOpen, setIsUtilsOpen] = React.useState(false);
-  const [isVisible, setIsVisible] = React.useState(true);
-  const [lastScrollY, setLastScrollY] = React.useState(0);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isUtilsOpen, setIsUtilsOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
       if (currentScrollY > lastScrollY && currentScrollY > 50) {
@@ -33,9 +35,13 @@ const Navbar = () => {
   const navLinks = [
     { to: '/', label: 'Trang Chủ', icon: Home },
     { to: '/projects', label: 'SẢN PHẨM', icon: Map },
-    { to: '/consignment', label: 'Ký Gửi', icon: Newspaper },
-    { to: '#', label: 'Tin Tức', icon: Newspaper },
   ];
+
+  if (settings?.enableConsignment) {
+    navLinks.push({ to: '/consignment', label: 'Ký Gửi', icon: Newspaper });
+  }
+
+  navLinks.push({ to: '#', label: 'Tin Tức', icon: Newspaper });
 
   return (
     <nav className={`fixed w-full z-50 transition-all duration-300 no-print ${isVisible ? 'translate-y-0' : '-translate-y-full'} ${isHome ? 'bg-transparent text-white pt-6' : 'bg-navy-900 text-white shadow-lg py-4'}`}>
@@ -145,7 +151,7 @@ const Navbar = () => {
   );
 };
 
-const Footer = () => (
+const Footer = ({ settings }: { settings: any }) => (
   <footer className="bg-navy-900 text-gray-300 py-12 border-t border-gray-800 no-print">
     <div className="container mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
       <div>
@@ -156,15 +162,15 @@ const Footer = () => (
       </div>
       <div>
         <h4 className="text-white font-bold mb-4 uppercase text-sm tracking-wider">Liên Hệ</h4>
-        <p className="text-sm mb-2">Hotline: 0969 320 229</p>
+        <p className="text-sm mb-2">Hotline: {settings?.hotline || '0969 320 229'}</p>
         <p className="text-sm mb-2">Email: info.bomboreal@gmail.com</p>
-        <p className="text-sm">Địa chỉ: Bom Bo Real, KĐT THÁI THÀNH BOM BO, Xã Bom Bo, Đồng Nai</p>
+        <p className="text-sm">Địa chỉ: {settings?.officeAddress || 'Bom Bo Real, KĐT THÁI THÀNH BOM BO, Xã Bom Bo, Đồng Nai'}</p>
       </div>
       <div>
         <h4 className="text-white font-bold mb-4 uppercase text-sm tracking-wider">Kết Nối</h4>
         <div className="flex space-x-4">
-          <a href="#" className="text-gray-400 hover:text-gold-400">Facebook</a>
-          <a href="#" className="text-gray-400 hover:text-gold-400">Zalo</a>
+          <a href={settings?.facebookLink || "#"} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gold-400">Facebook</a>
+          <a href={settings?.zaloLink || `https://zalo.me/${settings?.hotline?.replace(/\s/g, '') || '0969320229'}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gold-400">Zalo</a>
           <a href="#" className="text-gray-400 hover:text-gold-400">Youtube</a>
         </div>
       </div>
@@ -178,22 +184,32 @@ const Footer = () => (
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const isHome = location.pathname === '/';
+  const [settings, setSettings] = useState<any>(null);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'app_settings', 'general'), (snapshot) => {
+      if (snapshot.exists()) {
+        setSettings(snapshot.data());
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col font-sans">
-      <Navbar />
+      <Navbar settings={settings} />
       <main className={`flex-grow ${isHome ? '' : 'pt-20'}`}>
         {children}
       </main>
-      <Footer />
+      <Footer settings={settings} />
       <div className="no-print">
-        <ChatWidget />
+        {settings?.enableAIChat !== false && <ChatWidget />}
       </div>
       
       {/* Floating Contact Buttons */}
       <div className="fixed bottom-24 right-6 z-40 flex flex-col gap-2 no-print">
         <a 
-          href="tel:0969320229" 
+          href={`tel:${settings?.hotline?.replace(/\s/g, '') || '0969320229'}`} 
           className="bg-green-600 text-white p-1.5 rounded-full shadow-lg hover:bg-green-700 transition-all animate-bounce"
           title="Gọi điện"
         >
@@ -202,7 +218,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </svg>
         </a>
         <a 
-          href="https://zalo.me/0969320229" 
+          href={settings?.zaloLink || `https://zalo.me/${settings?.hotline?.replace(/\s/g, '') || '0969320229'}`} 
           target="_blank" 
           rel="noopener noreferrer"
           className="bg-blue-500 text-white p-1.5 rounded-full shadow-lg hover:bg-blue-600 transition-all"
