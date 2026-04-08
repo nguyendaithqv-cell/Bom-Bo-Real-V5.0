@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Calculator, Calendar, Download, Info, X, ExternalLink, FileText, Table } from 'lucide-react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -168,7 +168,7 @@ export const InterestRatePage: React.FC = () => {
       new Intl.NumberFormat('vi-VN').format(Math.round(item.remainingBalance))
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
       startY: 60,

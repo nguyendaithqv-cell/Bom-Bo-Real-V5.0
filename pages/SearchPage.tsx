@@ -13,6 +13,7 @@ export const SearchPage: React.FC = () => {
   const [bomboPlots, setBomboPlots] = useState<LandPlot[]>([]);
   const [otherPlots, setOtherPlots] = useState<LandPlot[]>([]);
   const [heroImage, setHeroImage] = useState(PROJECT_HERO_IMAGE);
+  const [settings, setSettings] = useState<any>(null);
   const navigate = useNavigate();
 
   // Pre-load data when page opens
@@ -23,6 +24,7 @@ export const SearchPage: React.FC = () => {
     const unsubscribe = onSnapshot(doc(db, 'app_settings', 'general'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
+        setSettings(data);
         if (data.heroImageUrl) {
           setHeroImage(data.heroImageUrl);
         }
@@ -74,13 +76,13 @@ export const SearchPage: React.FC = () => {
       <div className="relative z-20 h-full flex flex-col justify-center items-center px-4">
         <div className="text-center mb-10 animate-fade-in-up">
           <h2 className="text-gold-400 font-bold tracking-[0.2em] text-sm md:text-base mb-4 uppercase">
-            Khu đô thị trẻ tương lai
+            {settings?.slogan || 'Khu đô thị trẻ tương lai'}
           </h2>
           <h1 className="text-5xl md:text-7xl font-serif font-bold text-white mb-6 drop-shadow-2xl">
-            THÁI THÀNH BOM BO
+            {settings?.mainTitle || 'THÁI THÀNH BOM BO'}
           </h1>
           <p className="text-gray-200 text-lg md:text-xl max-w-2xl mx-auto font-light">
-            Nơi Xứng Tầm Cho Bạn
+            {settings?.subTitle || 'Nơi Xứng Tầm Cho Bạn'}
           </p>
         </div>
 

@@ -91,6 +91,27 @@ interface AppSettings {
   telegramBotToken?: string;
   telegramChatId?: string;
   enableTelegramNotify?: boolean;
+  // New settings
+  seoTitle?: string;
+  seoDescription?: string;
+  googleAnalyticsId?: string;
+  facebookPixelId?: string;
+  email?: string;
+  youtubeLink?: string;
+  footerCompanyName?: string;
+  footerTaxCode?: string;
+  slogan?: string;
+  copyrightInfo?: string;
+  footerLinks?: { label: string; url: string }[];
+  maintenanceMessage?: string;
+  maintenanceImageUrl?: string;
+  imageCompressionQuality?: number;
+  disableRightClick?: boolean;
+  disableTextSelection?: boolean;
+  enableWatermark?: boolean;
+  watermarkText?: string;
+  mainTitle?: string;
+  subTitle?: string;
 }
 
 const Sidebar = ({ activeTab, setActiveTab, unreadCounts, onLogout }: { 
@@ -113,6 +134,7 @@ const Sidebar = ({ activeTab, setActiveTab, unreadCounts, onLogout }: {
     { id: 'resale', name: 'Khách Hàng Bán Lại', countKey: 'resale' },
     { id: 'offers', name: 'Danh Sách Trả Giá', countKey: 'offers' },
     { id: 'contacts', name: 'Tin Nhắn Liên Hệ', countKey: 'contacts' },
+    { id: 'backup', name: 'Backup & Export' },
     { id: 'settings', name: 'Cài đặt hệ thống' },
   ];
   return (
@@ -373,7 +395,19 @@ const AnalyticsView = ({ visitors, plots, offers }: { visitors: VisitorLog[], pl
   );
 };
 
-const OfficeView = ({ visitors }: { visitors: VisitorLog[] }) => {
+const OfficeView = ({ 
+  visitors, 
+  localSettings, 
+  updateLocalSetting, 
+  handleSaveSettings, 
+  isSaving 
+}: { 
+  visitors: VisitorLog[], 
+  localSettings: AppSettings | null,
+  updateLocalSetting: (updates: Partial<AppSettings>) => void,
+  handleSaveSettings: () => Promise<void>,
+  isSaving: boolean
+}) => {
   const staff = visitors.filter(v => v.status === 'employee');
 
   return (
@@ -433,14 +467,57 @@ const OfficeView = ({ visitors }: { visitors: VisitorLog[] }) => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">Tên văn phòng</label>
-            <input type="text" defaultValue="Bất Động Sản Bom Bo" className="w-full border rounded-lg p-3 bg-gray-50 focus:ring-2 focus:ring-gold-500 outline-none" />
+            <input 
+              type="text" 
+              value={localSettings?.footerCompanyName || ''} 
+              onChange={(e) => updateLocalSetting({ footerCompanyName: e.target.value })}
+              className="w-full border rounded-lg p-3 bg-gray-50 focus:ring-2 focus:ring-gold-500 outline-none" 
+            />
           </div>
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">Hotline</label>
-            <input type="text" defaultValue="0969 320 229" className="w-full border rounded-lg p-3 bg-gray-50 focus:ring-2 focus:ring-gold-500 outline-none" />
+            <input 
+              type="text" 
+              value={localSettings?.hotline || ''} 
+              onChange={(e) => updateLocalSetting({ hotline: e.target.value })}
+              className="w-full border rounded-lg p-3 bg-gray-50 focus:ring-2 focus:ring-gold-500 outline-none" 
+            />
           </div>
-          <button className="bg-navy-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-navy-800 transition-all">Lưu thay đổi</button>
+          <button 
+            onClick={handleSaveSettings}
+            disabled={isSaving}
+            className={`bg-navy-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-navy-800 transition-all flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {isSaving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+          </button>
         </div>
+      </div>
+    </div>
+  );
+};
+
+const BackupExportView = ({ visitors, conversations, offers }: { visitors: VisitorLog[], conversations: Conversation[], offers: Offer[] }) => {
+  const exportToCSV = (data: any[], headers: string[], filename: string) => {
+    const csvContent = "\uFEFF" + headers.join(",") + "\n"
+      + data.map(row => row.map((r: any) => `"${String(r).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${filename}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <h2 className="text-2xl font-bold text-navy-900 font-serif">Backup & Export</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <button onClick={() => exportToCSV(visitors.map(v => [v.id, v.name || 'Ẩn danh', v.phoneNumber || 'N/A']), ["ID", "Tên", "SĐT"], "khach_hang")} className="bg-navy-900 text-white p-6 rounded-xl font-bold hover:bg-navy-800">Xuất Khách hàng (CSV)</button>
+        <button onClick={() => exportToCSV(conversations.map(c => [c.id, c.userId, c.messages.length]), ["ID", "User ID", "Số tin nhắn"], "chat")} className="bg-navy-900 text-white p-6 rounded-xl font-bold hover:bg-navy-800">Xuất Chat (CSV)</button>
+        <button onClick={() => exportToCSV(offers.map(o => [o.id, o.plotId, o.offeredPrice]), ["ID", "Plot ID", "Giá trả"], "tra_gia")} className="bg-navy-900 text-white p-6 rounded-xl font-bold hover:bg-navy-800">Xuất Trả giá (CSV)</button>
       </div>
     </div>
   );
@@ -502,6 +579,8 @@ export const AdminPage: React.FC = () => {
     enableOffers: true,
     maintenanceMode: false
   });
+  const [localSettings, setLocalSettings] = useState<AppSettings | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorLog | null>(null);
@@ -607,12 +686,22 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  const handleUpdateSettings = async (newSettings: Partial<AppSettings>) => {
+  const handleSaveSettings = async () => {
+    if (!localSettings) return;
+    setIsSaving(true);
     try {
-      await setDoc(doc(db, 'app_settings', 'general'), newSettings, { merge: true });
+      await setDoc(doc(db, 'app_settings', 'general'), localSettings, { merge: true });
+      alert('Đã lưu cấu hình thành công!');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'app_settings/general');
+      alert('Lỗi khi lưu cấu hình!');
+    } finally {
+      setIsSaving(false);
     }
+  };
+
+  const updateLocalSetting = (newSettings: Partial<AppSettings>) => {
+    setLocalSettings(prev => prev ? { ...prev, ...newSettings } : null);
   };
 
   const markAsRead = async (collectionName: string, id: string) => {
@@ -684,7 +773,7 @@ export const AdminPage: React.FC = () => {
     const unsubscribeSettings = onSnapshot(doc(db, 'app_settings', 'general'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        setAppSettings({
+        const settings: AppSettings = {
           showBombo: data.showBombo ?? true,
           showOther: data.showOther ?? true,
           hotline: data.hotline ?? '0969320229',
@@ -702,8 +791,25 @@ export const AdminPage: React.FC = () => {
           maintenanceMode: data.maintenanceMode ?? false,
           telegramBotToken: data.telegramBotToken ?? '',
           telegramChatId: data.telegramChatId ?? '',
-          enableTelegramNotify: data.enableTelegramNotify ?? false
-        });
+          enableTelegramNotify: data.enableTelegramNotify ?? false,
+          imageCompressionQuality: data.imageCompressionQuality ?? 80,
+          disableRightClick: data.disableRightClick ?? false,
+          disableTextSelection: data.disableTextSelection ?? false,
+          enableWatermark: data.enableWatermark ?? false,
+          watermarkText: data.watermarkText ?? '',
+          seoTitle: data.seoTitle ?? '',
+          seoDescription: data.seoDescription ?? '',
+          googleAnalyticsId: data.googleAnalyticsId ?? '',
+          facebookPixelId: data.facebookPixelId ?? '',
+          email: data.email ?? '',
+          youtubeLink: data.youtubeLink ?? '',
+          footerCompanyName: data.footerCompanyName ?? '',
+          footerTaxCode: data.footerTaxCode ?? '',
+          slogan: data.slogan ?? '',
+          copyrightInfo: data.copyrightInfo ?? ''
+        };
+        setAppSettings(settings);
+        setLocalSettings(prev => prev || settings);
       } else {
         setDoc(doc(db, 'app_settings', 'general'), { 
           showBombo: true, 
@@ -712,7 +818,12 @@ export const AdminPage: React.FC = () => {
           enableAIChat: true,
           enableConsignment: true,
           enableOffers: true,
-          maintenanceMode: false
+          maintenanceMode: false,
+          imageCompressionQuality: 80,
+          disableRightClick: false,
+          disableTextSelection: false,
+          enableWatermark: false,
+          watermarkText: ''
         });
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, 'app_settings/general'));
@@ -1058,8 +1169,8 @@ export const AdminPage: React.FC = () => {
       case 'resale':
         const currentConvs = filteredConversations.slice(startIndex, endIndex);
         return (
-          <div className="flex h-[calc(100vh-160px)] bg-white rounded-lg shadow overflow-hidden">
-            <div className="w-1/3 border-r flex flex-col">
+          <div className="flex flex-col md:flex-row h-[calc(100vh-160px)] bg-white rounded-lg shadow overflow-hidden">
+            <div className={`${selectedConv ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r flex-col`}>
               <div className="flex-grow overflow-y-auto">
                 {currentConvs.map(conv => (
                   <div 
@@ -1085,9 +1196,14 @@ export const AdminPage: React.FC = () => {
               </div>
               {renderPagination(filteredConversations.length)}
             </div>
-            <div className="w-2/3 p-6 overflow-y-auto flex flex-col">
+            <div className={`${selectedConv ? 'flex' : 'hidden md:flex'} w-full md:w-2/3 p-4 md:p-6 overflow-y-auto flex-col`}>
               {selectedConv ? (
                 <div className="flex-grow space-y-4">
+                  <div className="flex items-center mb-4 md:hidden">
+                    <button onClick={() => setSelectedConv(null)} className="text-navy-600 font-bold flex items-center">
+                      <span className="mr-2">←</span> Quay lại
+                    </button>
+                  </div>
                   {(selectedConv.messages || []).map((msg, i) => (
                     <div key={i} className={`p-3 rounded-lg max-w-[80%] ${msg.role === 'user' ? 'bg-purple-100 ml-auto' : 'bg-gray-100'}`}>
                       <span className="font-bold block text-xs mb-1">{msg.role === 'user' ? 'Khách' : 'AI'}</span> {msg.text}
@@ -1127,8 +1243,8 @@ export const AdminPage: React.FC = () => {
       case 'offers':
         const currentOffers = offers.slice(startIndex, endIndex);
         return (
-          <div className="flex h-[calc(100vh-160px)] bg-white rounded-lg shadow overflow-hidden">
-            <div className="w-1/3 border-r flex flex-col">
+          <div className="flex flex-col md:flex-row h-[calc(100vh-160px)] bg-white rounded-lg shadow overflow-hidden">
+            <div className={`${selectedConv ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r flex-col`}>
               <div className="flex-grow overflow-y-auto">
                 {currentOffers.map(offer => (
                   <div 
@@ -1151,11 +1267,16 @@ export const AdminPage: React.FC = () => {
               </div>
               {renderPagination(offers.length)}
             </div>
-            <div className="w-2/3 p-6 overflow-y-auto flex flex-col">
+            <div className={`${selectedConv ? 'flex' : 'hidden md:flex'} w-full md:w-2/3 p-4 md:p-6 overflow-y-auto flex-col`}>
               {selectedConv ? (() => {
                 const offer = offers.find(o => o.id === selectedConv.id);
                 return offer ? (
                   <div className="flex-grow space-y-4">
+                    <div className="flex items-center mb-4 md:hidden">
+                      <button onClick={() => setSelectedConv(null)} className="text-navy-600 font-bold flex items-center">
+                        <span className="mr-2">←</span> Quay lại
+                      </button>
+                    </div>
                     <p className="font-bold text-lg">Chi tiết trả giá</p>
                     <p><strong>Nền:</strong> {offer.plotId}</p>
                     <p><strong>Tên khách:</strong> {offer.name}</p>
@@ -1198,8 +1319,8 @@ export const AdminPage: React.FC = () => {
       case 'contacts':
         const currentContacts = contacts.slice(startIndex, endIndex);
         return (
-          <div className="flex h-[calc(100vh-160px)] bg-white rounded-lg shadow overflow-hidden">
-            <div className="w-1/3 border-r flex flex-col">
+          <div className="flex flex-col md:flex-row h-[calc(100vh-160px)] bg-white rounded-lg shadow overflow-hidden">
+            <div className={`${selectedConv ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r flex-col`}>
               <div className="flex-grow overflow-y-auto">
                 {currentContacts.map(contact => (
                   <div 
@@ -1222,11 +1343,16 @@ export const AdminPage: React.FC = () => {
               </div>
               {renderPagination(contacts.length)}
             </div>
-            <div className="w-2/3 p-6 overflow-y-auto flex flex-col">
+            <div className={`${selectedConv ? 'flex' : 'hidden md:flex'} w-full md:w-2/3 p-4 md:p-6 overflow-y-auto flex-col`}>
               {selectedConv ? (() => {
                 const contact = contacts.find(c => c.id === selectedConv.id);
                 return contact ? (
                   <div className="flex-grow space-y-4">
+                    <div className="flex items-center mb-4 md:hidden">
+                      <button onClick={() => setSelectedConv(null)} className="text-navy-600 font-bold flex items-center">
+                        <span className="mr-2">←</span> Quay lại
+                      </button>
+                    </div>
                     <p className="font-bold text-lg">Tin nhắn từ {contact.name}</p>
                     <p><strong>Email:</strong> {contact.email}</p>
                     <p><strong>Số điện thoại:</strong> {contact.phone}</p>
@@ -1693,10 +1819,41 @@ export const AdminPage: React.FC = () => {
       case 'analytics':
         return <AnalyticsView visitors={visitors} plots={plots} offers={offers} />;
       case 'office':
-        return <OfficeView visitors={visitors} />;
-      case 'settings':
         return (
-          <div className="space-y-8 max-w-4xl">
+          <OfficeView 
+            visitors={visitors} 
+            localSettings={localSettings}
+            updateLocalSetting={updateLocalSetting}
+            handleSaveSettings={handleSaveSettings}
+            isSaving={isSaving}
+          />
+        );
+      case 'backup':
+        return <BackupExportView visitors={visitors} conversations={conversations} offers={offers} />;
+      case 'settings':
+        if (!localSettings) return <div className="p-8 text-center">Đang tải cấu hình...</div>;
+        return (
+          <div className="space-y-8 max-w-4xl pb-20">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm sticky top-0 z-10 border border-gold-100">
+              <div>
+                <h2 className="text-xl font-bold text-navy-900">Cài đặt hệ thống</h2>
+                <p className="text-xs text-gray-500">Chỉnh sửa các thông số và nhấn Lưu để áp dụng</p>
+              </div>
+              <button 
+                onClick={handleSaveSettings}
+                disabled={isSaving}
+                className={`px-8 py-3 bg-gold-500 text-white rounded-xl font-bold shadow-lg hover:bg-gold-600 transition-all flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {isSaving ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                )}
+                {isSaving ? 'Đang lưu...' : 'Lưu cấu hình'}
+              </button>
+            </div>
+
+            {/* 1. Cấu hình hiển thị sản phẩm */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">1. Cấu hình hiển thị sản phẩm</h2>
               <div className="space-y-6">
@@ -1706,10 +1863,10 @@ export const AdminPage: React.FC = () => {
                     <p className="text-sm text-gray-500">Bật/tắt hiển thị danh sách sản phẩm Thái Thành Bom Bo</p>
                   </div>
                   <button 
-                    onClick={() => handleUpdateSettings({ showBombo: !appSettings.showBombo })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.showBombo ? 'bg-gold-500' : 'bg-gray-300'}`}
+                    onClick={() => updateLocalSetting({ showBombo: !localSettings.showBombo })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${localSettings.showBombo ? 'bg-gold-500' : 'bg-gray-300'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.showBombo ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.showBombo ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
 
@@ -1719,24 +1876,25 @@ export const AdminPage: React.FC = () => {
                     <p className="text-sm text-gray-500">Bật/tắt hiển thị danh sách các sản phẩm bất động sản khác</p>
                   </div>
                   <button 
-                    onClick={() => handleUpdateSettings({ showOther: !appSettings.showOther })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.showOther ? 'bg-gold-500' : 'bg-gray-300'}`}
+                    onClick={() => updateLocalSetting({ showOther: !localSettings.showOther })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${localSettings.showOther ? 'bg-gold-500' : 'bg-gray-300'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.showOther ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.showOther ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
               </div>
             </div>
 
+            {/* 2. Thông tin liên hệ */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">2. Thông tin liên hệ</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Số Hotline</label>
                   <input 
                     type="text" 
-                    value={appSettings.hotline}
-                    onChange={(e) => handleUpdateSettings({ hotline: e.target.value })}
+                    value={localSettings.hotline}
+                    onChange={(e) => updateLocalSetting({ hotline: e.target.value })}
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                   />
                 </div>
@@ -1744,117 +1902,282 @@ export const AdminPage: React.FC = () => {
                   <label className="block text-sm font-bold text-gray-700 mb-2">Link Zalo</label>
                   <input 
                     type="text" 
-                    value={appSettings.zaloLink}
-                    onChange={(e) => handleUpdateSettings({ zaloLink: e.target.value })}
+                    value={localSettings.zaloLink || ''}
+                    onChange={(e) => updateLocalSetting({ zaloLink: e.target.value })}
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Email</label>
+                  <input 
+                    type="text" 
+                    value={localSettings.email || ''}
+                    onChange={(e) => updateLocalSetting({ email: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Link Youtube</label>
+                  <input 
+                    type="text" 
+                    value={localSettings.youtubeLink || ''}
+                    onChange={(e) => updateLocalSetting({ youtubeLink: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* 3. Cấu hình SEO & MKT */}
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">3. Cấu hình SEO & MKT</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">SEO Title</label>
+                  <input 
+                    type="text" 
+                    value={localSettings.seoTitle || ''}
+                    onChange={(e) => updateLocalSetting({ seoTitle: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">SEO Description</label>
+                  <input 
+                    type="text" 
+                    value={localSettings.seoDescription || ''}
+                    onChange={(e) => updateLocalSetting({ seoDescription: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Google Analytics ID</label>
+                  <input 
+                    type="text" 
+                    value={localSettings.googleAnalyticsId || ''}
+                    onChange={(e) => updateLocalSetting({ googleAnalyticsId: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Facebook Pixel ID</label>
+                  <input 
+                    type="text" 
+                    value={localSettings.facebookPixelId || ''}
+                    onChange={(e) => updateLocalSetting({ facebookPixelId: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div className="lg:col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-2">Link Facebook</label>
                   <input 
                     type="text" 
-                    value={appSettings.facebookLink}
-                    onChange={(e) => handleUpdateSettings({ facebookLink: e.target.value })}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Địa chỉ văn phòng</label>
-                  <input 
-                    type="text" 
-                    value={appSettings.officeAddress}
-                    onChange={(e) => handleUpdateSettings({ officeAddress: e.target.value })}
+                    value={localSettings.facebookLink || ''}
+                    onChange={(e) => updateLocalSetting({ facebookLink: e.target.value })}
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                   />
                 </div>
               </div>
             </div>
 
+            {/* 4. Cấu hình bảo mật & Ảnh */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">3. Thông báo & Quảng bá</h2>
-              <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">4. Cấu hình bảo mật & Ảnh</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <label className="text-sm font-bold text-gray-700 mr-2">Chống chuột phải</label>
+                  <button 
+                    onClick={() => updateLocalSetting({ disableRightClick: !localSettings.disableRightClick })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${localSettings.disableRightClick ? 'bg-gold-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.disableRightClick ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <label className="text-sm font-bold text-gray-700 mr-2">Chống copy văn bản</label>
+                  <button 
+                    onClick={() => updateLocalSetting({ disableTextSelection: !localSettings.disableTextSelection })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${localSettings.disableTextSelection ? 'bg-gold-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.disableTextSelection ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <label className="text-sm font-bold text-gray-700 mr-2">Tự động đóng dấu ảnh</label>
+                  <button 
+                    onClick={() => updateLocalSetting({ enableWatermark: !localSettings.enableWatermark })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${localSettings.enableWatermark ? 'bg-gold-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.enableWatermark ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                <div className="lg:col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Nội dung đóng dấu</label>
+                  <input 
+                    type="text" 
+                    value={localSettings.watermarkText || ''}
+                    onChange={(e) => updateLocalSetting({ watermarkText: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div className="lg:col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Chất lượng nén ảnh (1-100)</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    max="100"
+                    value={localSettings.imageCompressionQuality || 80}
+                    onChange={(e) => updateLocalSetting({ imageCompressionQuality: parseInt(e.target.value) })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 5. Thông tin chân trang & Thông báo */}
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">5. Thông tin chân trang & Thông báo</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Tên công ty</label>
+                  <input 
+                    type="text" 
+                    value={localSettings.footerCompanyName || ''}
+                    onChange={(e) => updateLocalSetting({ footerCompanyName: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Mã số thuế</label>
+                  <input 
+                    type="text" 
+                    value={localSettings.footerTaxCode || ''}
+                    onChange={(e) => updateLocalSetting({ footerTaxCode: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Slogan</label>
+                  <input 
+                    type="text" 
+                    value={localSettings.slogan || ''}
+                    onChange={(e) => updateLocalSetting({ slogan: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Thông tin bản quyền</label>
+                  <input 
+                    type="text" 
+                    value={localSettings.copyrightInfo || ''}
+                    onChange={(e) => updateLocalSetting({ copyrightInfo: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div className="lg:col-span-2 flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                   <div className="flex-grow mr-4">
                     <h3 className="font-bold text-navy-900">Dòng chữ chạy (Marquee)</h3>
                     <input 
                       type="text" 
                       placeholder="Nhập nội dung thông báo..."
-                      value={appSettings.marqueeText}
-                      onChange={(e) => handleUpdateSettings({ marqueeText: e.target.value })}
+                      value={localSettings.marqueeText}
+                      onChange={(e) => updateLocalSetting({ marqueeText: e.target.value })}
                       className="w-full mt-2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                     />
                   </div>
                   <button 
-                    onClick={() => handleUpdateSettings({ showMarquee: !appSettings.showMarquee })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.showMarquee ? 'bg-gold-500' : 'bg-gray-300'}`}
+                    onClick={() => updateLocalSetting({ showMarquee: !localSettings.showMarquee })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${localSettings.showMarquee ? 'bg-gold-500' : 'bg-gray-300'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.showMarquee ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.showMarquee ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div className="lg:col-span-2 flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                   <div className="flex-grow mr-4">
                     <h3 className="font-bold text-navy-900">Popup thông báo</h3>
                     <textarea 
                       placeholder="Nhập nội dung popup..."
-                      value={appSettings.popupContent}
-                      onChange={(e) => handleUpdateSettings({ popupContent: e.target.value })}
+                      value={localSettings.popupContent}
+                      onChange={(e) => updateLocalSetting({ popupContent: e.target.value })}
                       className="w-full mt-2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none h-24"
                     />
                   </div>
                   <button 
-                    onClick={() => handleUpdateSettings({ showPopup: !appSettings.showPopup })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.showPopup ? 'bg-gold-500' : 'bg-gray-300'}`}
+                    onClick={() => updateLocalSetting({ showPopup: !localSettings.showPopup })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${localSettings.showPopup ? 'bg-gold-500' : 'bg-gray-300'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.showPopup ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.showPopup ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
               </div>
             </div>
 
+            {/* 6. Quản lý tính năng */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">4. Quản lý tính năng</h2>
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">6. Quản lý tính năng</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-gray-50 rounded-xl flex flex-col items-center text-center">
                   <span className="font-bold mb-2">Chatbot AI</span>
                   <button 
-                    onClick={() => handleUpdateSettings({ enableAIChat: !appSettings.enableAIChat })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.enableAIChat ? 'bg-gold-500' : 'bg-gray-300'}`}
+                    onClick={() => updateLocalSetting({ enableAIChat: !localSettings.enableAIChat })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${localSettings.enableAIChat ? 'bg-gold-500' : 'bg-gray-300'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.enableAIChat ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.enableAIChat ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-xl flex flex-col items-center text-center">
                   <span className="font-bold mb-2">Ký gửi</span>
                   <button 
-                    onClick={() => handleUpdateSettings({ enableConsignment: !appSettings.enableConsignment })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.enableConsignment ? 'bg-gold-500' : 'bg-gray-300'}`}
+                    onClick={() => updateLocalSetting({ enableConsignment: !localSettings.enableConsignment })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${localSettings.enableConsignment ? 'bg-gold-500' : 'bg-gray-300'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.enableConsignment ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.enableConsignment ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-xl flex flex-col items-center text-center">
                   <span className="font-bold mb-2">Trả giá</span>
                   <button 
-                    onClick={() => handleUpdateSettings({ enableOffers: !appSettings.enableOffers })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.enableOffers ? 'bg-gold-500' : 'bg-gray-300'}`}
+                    onClick={() => updateLocalSetting({ enableOffers: !localSettings.enableOffers })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${localSettings.enableOffers ? 'bg-gold-500' : 'bg-gray-300'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.enableOffers ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.enableOffers ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
               </div>
             </div>
 
+            {/* 7. Giao diện & Hệ thống */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">5. Giao diện & Hệ thống</h2>
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">7. Giao diện & Hệ thống</h2>
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Link ảnh nền (Hero Image)</label>
                   <input 
                     type="text" 
                     placeholder="Dán link ảnh (https://...)"
-                    value={appSettings.heroImageUrl}
-                    onChange={(e) => handleUpdateSettings({ heroImageUrl: e.target.value })}
+                    value={localSettings.heroImageUrl}
+                    onChange={(e) => updateLocalSetting({ heroImageUrl: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Tiêu đề chính (Trang chủ)</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ví dụ: THÁI THÀNH BOM BO"
+                    value={localSettings.mainTitle || ''}
+                    onChange={(e) => updateLocalSetting({ mainTitle: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Tiêu đề nhỏ (Trang chủ)</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ví dụ: Nơi Xứng Tầm Cho Bạn"
+                    value={localSettings.subTitle || ''}
+                    onChange={(e) => updateLocalSetting({ subTitle: e.target.value })}
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                   />
                 </div>
@@ -1864,17 +2187,18 @@ export const AdminPage: React.FC = () => {
                     <p className="text-sm text-red-700">Khi bật, khách hàng sẽ không thể truy cập trang web</p>
                   </div>
                   <button 
-                    onClick={() => handleUpdateSettings({ maintenanceMode: !appSettings.maintenanceMode })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.maintenanceMode ? 'bg-red-600' : 'bg-gray-300'}`}
+                    onClick={() => updateLocalSetting({ maintenanceMode: !localSettings.maintenanceMode })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${localSettings.maintenanceMode ? 'bg-red-600' : 'bg-gray-300'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.maintenanceMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.maintenanceMode ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
               </div>
             </div>
 
+            {/* 8. Thông báo cho Admin (Telegram) */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">6. Thông báo cho Admin (Telegram)</h2>
+              <h2 className="text-2xl font-bold text-navy-900 mb-8 border-b pb-4">8. Thông báo cho Admin (Telegram)</h2>
               <div className="space-y-6">
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                   <div>
@@ -1882,21 +2206,21 @@ export const AdminPage: React.FC = () => {
                     <p className="text-sm text-gray-500">Nhận tin nhắn báo ngay khi có khách liên hệ, trả giá hoặc ký gửi</p>
                   </div>
                   <button 
-                    onClick={() => handleUpdateSettings({ enableTelegramNotify: !appSettings.enableTelegramNotify })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${appSettings.enableTelegramNotify ? 'bg-gold-500' : 'bg-gray-300'}`}
+                    onClick={() => updateLocalSetting({ enableTelegramNotify: !localSettings.enableTelegramNotify })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${localSettings.enableTelegramNotify ? 'bg-gold-500' : 'bg-gray-300'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${appSettings.enableTelegramNotify ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.enableTelegramNotify ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">Bot Token</label>
                     <input 
                       type="password" 
                       placeholder="Nhập Telegram Bot Token..."
-                      value={appSettings.telegramBotToken}
-                      onChange={(e) => handleUpdateSettings({ telegramBotToken: e.target.value })}
+                      value={localSettings.telegramBotToken}
+                      onChange={(e) => updateLocalSetting({ telegramBotToken: e.target.value })}
                       className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                     />
                     <p className="text-[10px] text-gray-400 mt-1">Lấy từ @BotFather</p>
@@ -1906,8 +2230,8 @@ export const AdminPage: React.FC = () => {
                     <input 
                       type="text" 
                       placeholder="Nhập Telegram Chat ID..."
-                      value={appSettings.telegramChatId}
-                      onChange={(e) => handleUpdateSettings({ telegramChatId: e.target.value })}
+                      value={localSettings.telegramChatId}
+                      onChange={(e) => updateLocalSetting({ telegramChatId: e.target.value })}
                       className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                     />
                     <p className="text-[10px] text-gray-400 mt-1">Lấy từ @userinfobot</p>
@@ -1916,17 +2240,17 @@ export const AdminPage: React.FC = () => {
                 <div className="pt-4 border-t">
                   <button 
                     onClick={async () => {
-                      if (!appSettings.telegramBotToken || !appSettings.telegramChatId) {
+                      if (!localSettings.telegramBotToken || !localSettings.telegramChatId) {
                         alert('Vui lòng điền đầy đủ Bot Token và Chat ID trước khi thử!');
                         return;
                       }
                       try {
-                        const url = `https://api.telegram.org/bot${appSettings.telegramBotToken}/sendMessage`;
+                        const url = `https://api.telegram.org/bot${localSettings.telegramBotToken}/sendMessage`;
                         const response = await fetch(url, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
-                            chat_id: appSettings.telegramChatId,
+                            chat_id: localSettings.telegramChatId,
                             text: '<b>✅ THỬ NGHIỆM THÀNH CÔNG</b>\n\nChúc mừng! Hệ thống thông báo Telegram của Bom Bo Real đã được kết nối chính xác.',
                             parse_mode: 'HTML'
                           })
@@ -1948,6 +2272,21 @@ export const AdminPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+            </div>
+            
+            {/* Floating Save Button for Mobile/Convenience */}
+            <div className="fixed bottom-8 right-8 md:hidden">
+              <button 
+                onClick={handleSaveSettings}
+                disabled={isSaving}
+                className="w-14 h-14 bg-gold-500 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform active:scale-95"
+              >
+                {isSaving ? (
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                )}
+              </button>
             </div>
           </div>
         );

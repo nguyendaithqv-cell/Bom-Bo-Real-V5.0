@@ -84,10 +84,10 @@ export const DetailPage: React.FC = () => {
   };
 
   return (
-    <div className={`${getStatusBgColor(plot.status)} pb-20 pt-20 min-h-screen`}>
+    <div className={`${getStatusBgColor(plot.status)} pb-20 pt-10 min-h-screen`}>
       {/* Header Info */}
       <div className="bg-white shadow-sm border-b border-gray-100">
-        <div className="container mx-auto px-6 py-8">
+        <div className="container mx-auto px-6 py-6">
           <button onClick={() => navigate(-1)} className="mb-4 text-navy-900 font-bold hover:text-gold-500 flex items-center gap-1">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             Quay lại
@@ -102,7 +102,7 @@ export const DetailPage: React.FC = () => {
               </div>
               <p className="text-gray-500 flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                {plot.phankhu || 'Phân khu A'} {plot.cdt ? `- ${plot.cdt} ` : ''}- {plot.duan || 'THÁI THÀNH BOM BO'}
+                {plot.phankhu || 'Phân khu A'} {plot.cdt ? `- ${plot.cdt} ` : ''}- {settings?.footerCompanyName || plot.duan || 'THÁI THÀNH BOM BO'}
               </p>
             </div>
             <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end w-full md:w-auto">

@@ -102,8 +102,15 @@ export const ProjectsPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {paginatedPlots.map(plot => (
                 <div key={plot.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                  <img src={plot.images[0] || "https://picsum.photos/400/300"} alt={`Lô ${plot.id}`} className="w-full h-48 object-cover rounded-lg mb-4" referrerPolicy="no-referrer" />
+                  <img 
+                    src={plot.images[0] || "https://picsum.photos/400/300"} 
+                    alt={`Lô ${plot.id}`} 
+                    className="w-full h-48 object-cover rounded-lg mb-4 cursor-pointer" 
+                    referrerPolicy="no-referrer" 
+                    onClick={() => navigate(`/plot/${plot.id}?source=${source}`)}
+                  />
                   <h4 className="font-bold text-lg mb-2">Lô: {plot.id}</h4>
+                  <p>Loại: {plot.loai || 'N/A'}</p>
                   <p>Diện tích: {plot.area} m²</p>
                   <p>Giá: {plot.totalPrice.toLocaleString('vi-VN')} VNĐ</p>
                   <Link to={`/plot/${plot.id}?source=${source}`} className="text-blue-600 hover:underline mt-auto pt-2">Xem chi tiết</Link>
