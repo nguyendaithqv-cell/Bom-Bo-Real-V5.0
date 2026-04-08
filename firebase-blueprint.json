@@ -132,7 +132,9 @@
         "maintenanceMode": { "type": "boolean", "description": "Enable/disable maintenance mode." },
         "telegramBotToken": { "type": "string", "description": "Telegram Bot API Token." },
         "telegramChatId": { "type": "string", "description": "Telegram Chat ID to receive notifications." },
-        "enableTelegramNotify": { "type": "boolean", "description": "Enable/disable Telegram notifications." }
+        "enableTelegramNotify": { "type": "boolean", "description": "Enable/disable Telegram notifications." },
+        "mainTitle": { "type": "string", "description": "Main title on the home page." },
+        "subTitle": { "type": "string", "description": "Sub title on the home page." }
       },
       "required": ["showBombo", "showOther", "hotline", "enableAIChat", "enableConsignment", "enableOffers", "maintenanceMode", "enableTelegramNotify"]
     }

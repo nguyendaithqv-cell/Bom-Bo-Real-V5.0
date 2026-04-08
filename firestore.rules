@@ -1,53 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: consignments
-    // Fields: fullName (string), phoneNumber (string), propertyType (string), address (string), price (string), createdAt (timestamp), isRead (bool)
-    //
-    // Collection: visitor_logs
-    // Fields: visitorId (string), name (string), phoneNumber (string), lastVisited (timestamp), viewedPlots (array), pageHistory (array), isRead (bool)
-    //
-    // Collection: conversations
-    // Fields: userId (string), createdAt (timestamp), messages (array), isRead (bool)
-    //
-    // Collection: contacts
-    // Fields: name (string), email (string), phone (string), message (string), createdAt (timestamp), isRead (bool)
-    //
-    // Collection: offers
-    // Fields: plotId (string), name (string), phone (string), offeredPrice (string), createdAt (timestamp), isRead (bool)
-    //
-    // Collection: users
-    // Fields: role (string), email (string)
-    //
-    // ===============================================================
-
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "nguyendai.thqv@gmail.com" && request.auth.token.email_verified == true));
-    }
-
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    // ===============================================================
-    // Collection Rules
-    // ===============================================================
-
     match /{document=**} {
       allow read, write: if true;
     }

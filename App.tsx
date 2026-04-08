@@ -8,6 +8,9 @@ import { ProjectsPage } from './pages/ProjectsPage';
 import { ContactPage } from './pages/ContactPage';
 import { InterestRatePage } from './pages/InterestRatePage';
 import { AreaPage } from './pages/AreaPage';
+import { ConstructionCalculatorPage } from './pages/ConstructionCalculatorPage';
+import { HouseDesignPage } from './pages/HouseDesignPage';
+import { RealEstateExpertPage } from './pages/RealEstateExpertPage';
 import { ConsignmentPage } from './pages/ConsignmentPage';
 import { Tracker } from './components/Tracker';
 import { db } from './firebase';
@@ -110,6 +113,9 @@ const App: React.FC = () => {
           <Route path="/contact" element={<Layout><ContactPage /></Layout>} />
           <Route path="/utilities/interest-rate" element={<Layout><InterestRatePage /></Layout>} />
           <Route path="/utilities/area" element={<Layout><AreaPage /></Layout>} />
+          <Route path="/utilities/construction-cost" element={<Layout><ConstructionCalculatorPage /></Layout>} />
+          <Route path="/utilities/design" element={<Layout><HouseDesignPage /></Layout>} />
+          <Route path="/utilities/expert" element={<Layout><RealEstateExpertPage /></Layout>} />
           <Route path="/consignment" element={<Layout><ConsignmentPage /></Layout>} />
         </Routes>
       </div>
