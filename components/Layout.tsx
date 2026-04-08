@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChatWidget } from './ChatWidget';
-import { Home, Map, Newspaper, Settings, Phone, User, ChevronDown, Calculator, Ruler } from 'lucide-react';
+import { Home, Map, Newspaper, Settings, Phone, User, ChevronDown, Calculator, Ruler, Palette, BrainCircuit } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 
@@ -47,7 +47,7 @@ const Navbar = ({ settings }: { settings: any }) => {
     <nav className={`fixed w-full z-50 transition-all duration-300 no-print ${isVisible ? 'translate-y-0' : '-translate-y-full'} ${isHome ? 'bg-transparent text-white pt-6' : 'bg-navy-900 text-white shadow-lg py-4'}`}>
       <div className="container mx-auto px-6 flex justify-between items-center">
         <Link to="/" className="text-2xl font-serif font-bold tracking-widest hover:text-gold-400 transition-colors">
-          BOM BO REAL
+          {settings?.footerCompanyName || 'BOM BO REAL'}
         </Link>
         
         {/* Desktop Menu */}
@@ -65,6 +65,9 @@ const Navbar = ({ settings }: { settings: any }) => {
             <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
               <Link to="/utilities/interest-rate" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gold-500">Tính Lãi Suất</Link>
               <Link to="/utilities/area" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gold-500">Tính Diện Tích</Link>
+              <Link to="/utilities/construction-cost" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gold-500">Dự Toán Xây Nhà</Link>
+              <Link to="/utilities/design" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gold-500">Thiết Kế Nhà AI</Link>
+              <Link to="/utilities/expert" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gold-500">Chuẩn đoán BĐS</Link>
             </div>
           </div>
 
@@ -125,6 +128,30 @@ const Navbar = ({ settings }: { settings: any }) => {
                   <Ruler className="w-4 h-4" />
                   <span>Tính Diện Tích</span>
                 </Link>
+                <Link 
+                  to="/utilities/construction-cost" 
+                  className="flex items-center space-x-3 py-3 hover:text-gold-400 transition-colors uppercase text-xs" 
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Home className="w-4 h-4" />
+                  <span>Dự Toán Xây Nhà</span>
+                </Link>
+                <Link 
+                  to="/utilities/design" 
+                  className="flex items-center space-x-3 py-3 hover:text-gold-400 transition-colors uppercase text-xs" 
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Palette className="w-4 h-4" />
+                  <span>Thiết Kế Nhà AI</span>
+                </Link>
+                <Link 
+                  to="/utilities/expert" 
+                  className="flex items-center space-x-3 py-3 hover:text-gold-400 transition-colors uppercase text-xs" 
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <BrainCircuit className="w-4 h-4" />
+                  <span>Chuẩn đoán BĐS</span>
+                </Link>
               </div>
             )}
           </div>
@@ -155,7 +182,10 @@ const Footer = ({ settings }: { settings: any }) => (
   <footer className="bg-navy-900 text-gray-300 py-12 border-t border-gray-800 no-print">
     <div className="container mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
       <div>
-        <h3 className="text-2xl font-serif text-white mb-4">BOM BO REAL</h3>
+        <h3 className="text-2xl font-serif text-white mb-4">{settings?.footerCompanyName || 'BOM BO REAL'}</h3>
+        <p className="text-sm leading-relaxed italic text-gold-400 mb-4">
+          {settings?.slogan || ''}
+        </p>
         <p className="text-sm leading-relaxed">
           Kiến tạo giá trị sống đẳng cấp. Nơi an cư lý tưởng và cơ hội đầu tư sinh lời vượt trội.
         </p>
@@ -163,20 +193,27 @@ const Footer = ({ settings }: { settings: any }) => (
       <div>
         <h4 className="text-white font-bold mb-4 uppercase text-sm tracking-wider">Liên Hệ</h4>
         <p className="text-sm mb-2">Hotline: {settings?.hotline || '0969 320 229'}</p>
-        <p className="text-sm mb-2">Email: info.bomboreal@gmail.com</p>
+        <p className="text-sm mb-2">Email: {settings?.email || 'info.bomboreal@gmail.com'}</p>
         <p className="text-sm">Địa chỉ: {settings?.officeAddress || 'Bom Bo Real, KĐT THÁI THÀNH BOM BO, Xã Bom Bo, Đồng Nai'}</p>
+        {settings?.footerTaxCode && (
+          <p className="text-sm mt-2">MST: {settings.footerTaxCode}</p>
+        )}
       </div>
       <div>
         <h4 className="text-white font-bold mb-4 uppercase text-sm tracking-wider">Kết Nối</h4>
         <div className="flex space-x-4">
-          <a href={settings?.facebookLink || "#"} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gold-400">Facebook</a>
+          {settings?.facebookLink && (
+            <a href={settings.facebookLink} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gold-400">Facebook</a>
+          )}
           <a href={settings?.zaloLink || `https://zalo.me/${settings?.hotline?.replace(/\s/g, '') || '0969320229'}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gold-400">Zalo</a>
-          <a href="#" className="text-gray-400 hover:text-gold-400">Youtube</a>
+          {settings?.youtubeLink && (
+            <a href={settings.youtubeLink} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gold-400">Youtube</a>
+          )}
         </div>
       </div>
     </div>
     <div className="text-center mt-12 text-xs text-gray-500">
-      @ 2026 Bom Bo Real.
+      {settings?.copyrightInfo || `@ ${new Date().getFullYear()} ${settings?.footerCompanyName || 'Bom Bo Real'}.`}
     </div>
   </footer>
 );
